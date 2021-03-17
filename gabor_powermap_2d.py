@@ -1,5 +1,8 @@
-import functools
-import six
+"""[summary]
+
+Returns:
+    [type]: [description]
+"""
 from typing import List
 import numpy as np
 import tensorflow as tf
@@ -7,32 +10,73 @@ from tensorflow.keras.layers import Layer
 
 
 def kernels2tensor(kernels: List[np.ndarray], dtype=tf.float32) -> tf.Tensor:
+    """[summary]
+
+    Args:
+        kernels (List[np.ndarray]): [description]
+        dtype ([type], optional): [description]. Defaults to tf.float32.
+
+    Returns:
+        tf.Tensor: [description]
+    """
     kernels = np.moveaxis(np.expand_dims(kernels, axis=-1), 0, -1)
     return tf.constant(kernels, dtype=dtype)
 
 
-def complex_exp(xs, ys, freq, angle_rad):
-    return np.exp(freq * (xs * np.sin(angle_rad) + ys * np.cos(angle_rad)) * 1.0j)
+def complex_exp(x_grid, y_grid, freq, angle_rad):
+    """[summary]
 
+    Args:
+        x_grid ([type]): [description]
+        y_grid ([type]): [description]
+        freq ([type]): [description]
+        angle_rad ([type]): [description]
 
-def gauss(xs, ys, sigma):
-    return (1 / (2 * np.pi * sigma ** 2)) * np.exp(
-        -(xs * xs + ys * ys) / (2.0 * sigma * sigma)
+    Returns:
+        [type]: [description]
+    """
+    return np.exp(
+        freq * (x_grid * np.sin(angle_rad) + y_grid * np.cos(angle_rad)) * 1.0j
     )
 
 
-def make_meshgrid(sz=9):
-    return np.meshgrid(
-        np.linspace(-(sz // 2), sz // 2, sz), np.linspace(-(sz // 2), sz // 2, sz)
-    )
-
-
-def make_gabor_kernels(xs, ys, directions=3, freqs=[2.0, 1.0]) -> tf.Tensor:
-    """makes a bank of gabor kernels as a complex tensor
+def gauss(x_grid, y_grid, sigma):
+    """[summary]
 
     Args:
         xs ([type]): [description]
         ys ([type]): [description]
+        sigma ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    return (1 / (2 * np.pi * sigma ** 2)) * np.exp(
+        -(x_grid * x_grid + y_grid * y_grid) / (2.0 * sigma * sigma)
+    )
+
+
+def make_meshgrid(size=9):
+    """[summary]
+
+    Args:
+        sz (int, optional): [description]. Defaults to 9.
+
+    Returns:
+        [type]: [description]
+    """
+    return np.meshgrid(
+        np.linspace(-(size // 2), size // 2, size),
+        np.linspace(-(size // 2), size // 2, size),
+    )
+
+
+def make_gabor_kernels(x_grid, y_grid, directions=3, freqs=[2.0, 1.0]) -> tf.Tensor:
+    """makes a bank of gabor kernels as a complex tensor
+
+    Args:
+        x_grid ([type]): [description]
+        y_grid ([type]): [description]
         directions (int, optional): [description]. Defaults to 3.
         freqs (list, optional): [description]. Defaults to [2.0, 1.0].
 
@@ -42,19 +86,19 @@ def make_gabor_kernels(xs, ys, directions=3, freqs=[2.0, 1.0]) -> tf.Tensor:
     angles_rad = [n * np.pi / float(directions) for n in range(directions)]
     sine_kernels = kernels2tensor(
         [
-            complex_exp(xs, ys, freq, angle_rad)
+            complex_exp(x_grid, y_grid, freq, angle_rad)
             for freq in freqs
             for angle_rad in angles_rad
         ]
     )
     sigmas = [2.0 / freq for freq in freqs]
-    gauss_kernels = kernels2tensor([gauss(xs, ys, sigma) for sigma in sigmas])
+    gauss_kernels = kernels2tensor([gauss(x_grid, y_grid, sigma) for sigma in sigmas])
     gauss_kernels = np.repeat(
         gauss_kernels, sine_kernels.shape[-1] // gauss_kernels.shape[-1], axis=-1
     )
 
     bank = gauss_kernels * sine_kernels
-    g0 = kernels2tensor([gauss(xs, ys, 4.0 / freqs[-1])])
+    g0 = kernels2tensor([gauss(x_grid, y_grid, 4.0 / freqs[-1])])
     return tf.concat([bank, g0], -1)
 
 
@@ -79,7 +123,7 @@ class GaborPowerMap2D(Layer):
 
     def build(self, input_shape):
         # computer gabor filter bank
-        xs, ys = make_meshgrid(sz=self.sz)
+        xs, ys = make_meshgrid(size=self.sz)
         kernels = make_gabor_kernels(
             xs, ys, directions=self.directions, freqs=self.freqs
         )
@@ -99,8 +143,10 @@ if __name__ == "__main__":
 
     directions = 5
     freqs = [2.0, 1.0]
-    xs, ys = make_meshgrid(sz=9)
-    gabor_kernels = make_gabor_kernels(xs, ys, directions=directions, freqs=freqs)
+    _x_grid, _y_grid = make_meshgrid(size=9)
+    gabor_kernels = make_gabor_kernels(
+        _x_grid, _y_grid, directions=directions, freqs=freqs
+    )
 
     _, axs = plt.subplots(
         len(freqs) + 1, directions, figsize=(directions * 3, len(freqs) * 3)
