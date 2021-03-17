@@ -59,7 +59,7 @@ def make_gabor_kernels(xs, ys, directions=3, freqs=[2.0, 1.0]) -> tf.Tensor:
     return tf.concat([bank, g0], -1)
 
 
-class GaborPowerMapLayer(Layer):
+class GaborPowerMap2D(Layer):
     """non-trainable gabor filter bank layer"""
 
     def __init__(self, name=None, directions=3, freqs=[2.0, 1.0], sz=13, **kwargs):
@@ -71,7 +71,7 @@ class GaborPowerMapLayer(Layer):
             freqs (list, optional): [description]. Defaults to [2.0, 1.0].
             sz (int, optional): [description]. Defaults to 13.
         """
-        super(GaborPowerMapLayer, self).__init__(
+        super(GaborPowerMap2D, self).__init__(
             trainable=False, name=name, activity_regularizer=None, **kwargs
         )
         self.directions = directions
