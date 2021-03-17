@@ -32,8 +32,8 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.models import Sequential
 
-from GaborPowerMap2D import GaborPowerMap2D
-from LogSumExpPooling2D import LogSumExpPooling2D
+from gabor_powermap_2d import GaborPowerMap2D
+from logsumexp_pooling_2d import LogSumExpPooling2D
 
 
 @logged
