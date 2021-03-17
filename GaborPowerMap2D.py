@@ -1,10 +1,9 @@
 import functools
 import six
 from typing import List
-
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Layer, Pooling2D
+from tensorflow.keras.layers import Layer
 
 
 def kernels2tensor(kernels: List[np.ndarray], dtype=tf.float32) -> tf.Tensor:
@@ -62,7 +61,7 @@ def make_gabor_kernels(xs, ys, directions=3, freqs=[2.0, 1.0]) -> tf.Tensor:
 class GaborPowerMap2D(Layer):
     """non-trainable gabor filter bank layer"""
 
-    def __init__(self, name=None, directions=3, freqs=[2.0, 1.0], sz=13, **kwargs):
+    def __init__(self, directions=3, freqs=[2.0, 1.0], sz=13, **kwargs):
         """[summary]
 
         Args:
@@ -72,7 +71,7 @@ class GaborPowerMap2D(Layer):
             sz (int, optional): [description]. Defaults to 13.
         """
         super(GaborPowerMap2D, self).__init__(
-            trainable=False, name=name, activity_regularizer=None, **kwargs
+            trainable=False, activity_regularizer=None, **kwargs
         )
         self.directions = directions
         self.freqs = freqs
@@ -93,64 +92,6 @@ class GaborPowerMap2D(Layer):
             + tf.nn.conv2d(inputs, self._imag_kernels, strides=1, padding="SAME") ** 2
         )
         return response
-
-
-def logsumexp_pool(
-    value,
-    ksize,
-    strides=[1, 2, 2, 1],
-    padding="SAME",
-    data_format="NHWC",
-    scale_up=1e2,
-    name=None,
-):
-    """function to calculate the log(sum(exp(x))) function,
-    which is a continuous approximation to the max function
-    """
-    assert len(value.shape) == 4
-    value = tf.transpose(value, perm=[3, 1, 2, 0])
-    scaled = tf.scalar_mul(scale_up, value)
-    patched_response = tf.image.extract_patches(
-        scaled,
-        sizes=[1, 2, 2, 1],  # TODO: pass these in???
-        strides=strides,
-        rates=[1, 1, 1, 1],
-        padding=padding,
-    )
-    logsumexp_result = tf.math.reduce_logsumexp(patched_response, axis=-1)
-    descaled = tf.scalar_mul(1.0 / scale_up, logsumexp_result)
-    return tf.transpose(tf.expand_dims(descaled, axis=-1), perm=[3, 1, 2, 0])
-
-
-class LogSumExpPooling2D(Pooling2D):
-    """[summary]"""
-
-    def __init__(
-        self,
-        pool_size=(2, 2),
-        strides=None,
-        padding="valid",
-        data_format=None,
-        scale_up=1e2,
-        **kwargs
-    ):
-        """[summary]
-
-        Args:
-            pool_size (tuple, optional): [description]. Defaults to (2, 2).
-            strides ([type], optional): [description]. Defaults to None.
-            padding (str, optional): [description]. Defaults to "valid".
-            data_format ([type], optional): [description]. Defaults to None.
-            scale_up ([type], optional): [description]. Defaults to 1e2.
-        """
-        super(LogSumExpPooling2D, self).__init__(
-            logsumexp_pool,
-            pool_size=pool_size,
-            strides=strides,
-            padding=padding,
-            data_format=data_format,
-            **kwargs
-        )
 
 
 if __name__ == "__main__":
