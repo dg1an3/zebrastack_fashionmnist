@@ -5,18 +5,43 @@ import tensorflow.keras.backend as K
 
 
 def normalize_data_format(value):
+    """[summary]
+
+    Args:
+        value ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
     data_format = value.lower()
     assert data_format in {"channels_first", "channels_last"}
     return data_format
 
 
 def normalize_padding(value):
+    """[summary]
+
+    Args:
+        value ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
     padding = value.lower()
     assert padding in {"valid", "same"}
     return padding
 
 
 def convert_data_format(data_format, ndim):
+    """[summary]
+
+    Args:
+        data_format ([type]): [description]
+        ndim ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
     return {
         "channels_last": {
             3: "NWC",
@@ -67,7 +92,20 @@ def logsumexp_pool(
 ):
     """function to calculate the log(sum(exp(x))) function,
     which is a continuous approximation to the max function
+
+    Args:
+        value ([type]): [description]
+        ksize ([type]): [description]
+        strides (list, optional): [description]. Defaults to [1, 2, 2, 1].
+        padding (str, optional): [description]. Defaults to "SAME".
+        data_format (str, optional): [description]. Defaults to "NHWC".
+        scale_up ([type], optional): [description]. Defaults to 1e2.
+        name ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        [type]: [description]
     """
+
     assert len(value.shape) == 4
     value = tf.transpose(value, perm=[3, 1, 2, 0])
     scaled = tf.scalar_mul(scale_up, value)

@@ -1,7 +1,4 @@
-"""[summary]
-
-Returns:
-    [type]: [description]
+"""implements the GaborPowerMap2D keras layer
 """
 from typing import List
 import numpy as np
@@ -10,14 +7,14 @@ from tensorflow.keras.layers import Layer
 
 
 def kernels2tensor(kernels: List[np.ndarray], dtype=tf.float32) -> tf.Tensor:
-    """[summary]
+    """turns list of numpy arrays to a tensor of given typeS
 
     Args:
-        kernels (List[np.ndarray]): [description]
-        dtype ([type], optional): [description]. Defaults to tf.float32.
+        kernels (List[np.ndarray]): input kernels
+        dtype ([type], optional): resulting tensor dtype. Defaults to tf.float32.
 
     Returns:
-        tf.Tensor: [description]
+        tf.Tensor: the tensor formed from the kernels.  axis for kernels is last
     """
     kernels = np.moveaxis(np.expand_dims(kernels, axis=-1), 0, -1)
     return tf.constant(kernels, dtype=dtype)
@@ -103,17 +100,10 @@ def make_gabor_kernels(x_grid, y_grid, directions=3, freqs=[2.0, 1.0]) -> tf.Ten
 
 
 class GaborPowerMap2D(Layer):
-    """non-trainable gabor filter bank layer"""
+    """[summary]"""
 
     def __init__(self, directions=3, freqs=[2.0, 1.0], sz=13, **kwargs):
-        """[summary]
 
-        Args:
-            name ([type], optional): [description]. Defaults to None.
-            directions (int, optional): [description]. Defaults to 3.
-            freqs (list, optional): [description]. Defaults to [2.0, 1.0].
-            sz (int, optional): [description]. Defaults to 13.
-        """
         super(GaborPowerMap2D, self).__init__(
             trainable=False, activity_regularizer=None, **kwargs
         )
@@ -122,6 +112,11 @@ class GaborPowerMap2D(Layer):
         self.sz = sz
 
     def build(self, input_shape):
+        """[summary]
+
+        Args:
+            input_shape ([type]): [description]
+        """
         # computer gabor filter bank
         xs, ys = make_meshgrid(size=self.sz)
         kernels = make_gabor_kernels(
@@ -131,6 +126,14 @@ class GaborPowerMap2D(Layer):
         self._imag_kernels = tf.math.imag(kernels)
 
     def call(self, inputs):
+        """[summary]
+
+        Args:
+            inputs ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
         response = (
             tf.nn.conv2d(inputs, self._real_kernels, strides=1, padding="SAME") ** 2
             + tf.nn.conv2d(inputs, self._imag_kernels, strides=1, padding="SAME") ** 2

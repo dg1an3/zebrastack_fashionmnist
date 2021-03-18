@@ -38,15 +38,16 @@ from logsumexp_pooling_2d import LogSumExpPooling2D
 
 @logged
 def prepare_images(img_array: np.ndarray, size=64):
-    """[summary]
+    """prepares images for training: whitening and reshaping
 
     Args:
-        img_array (np.ndarray): [description]
+        img_array (np.ndarray): the input image as a numpy array
         sz (int, optional): [description]. Defaults to 64.
 
     Returns:
-        [type]: [description]
+        np.ndarray: updated 4-d array
     """
+    assert len(img_array.shape) == 3
     img_array = (img_array / 255.0).astype(np.float32)
     # prepare_images._log.info(f"img_array: {img_array.shape} {img_array.dtype}")
     img_array = [resize(img_array[n], (size, size)) for n in range(img_array.shape[0])]
@@ -61,18 +62,24 @@ def create_encoder_v1(
     locally_connected_channels=2,
     act_func="softplus",
 ):
-    """creates the encoder side of the autoencoder, for the parameters sz and latent_dim
-    # Static parameters
+    """creates the encoder side of the autoencoder, mapping to latent_dim gaussian
+
+    Args:
         size (int): size x size input
         latent_dim (int): gaussian dimensions
         locally_connected_channels = 2
-    # Arguments
-        <none>
-    # Returns
-        retina: the input layer
-        encoder: the encoder model
-        shape: shape of last input layer
-        [z_mean, z_log_var, z]: tensors for latent space
+
+        size (int, optional):
+            input is size x size. Defaults to 64.
+        latent_dim (int, optional):
+            dimension of gaussian blob. Defaults to 8.
+        locally_connected_channels (int, optional):
+            channels on locally connected layer. Defaults to 2.
+        act_func (str, optional):
+            activation function for most layers. Defaults to "softplus".
+
+    Returns:
+        Sequential: encoder model
     """
 
     return Sequential(
@@ -119,18 +126,25 @@ def create_encoder_v2(
     locally_connected_channels=2,
     act_func="softplus",
 ):
-    """creates the encoder side of the autoencoder, for the parameters sz and latent_dim
-    # Static parameters
+    """creates the encoder side of the autoencoder, mapping to latent_dim gaussian
+    V2 replaces the Conv2D layers with gabor powermaps
+
+    Args:
         size (int): size x size input
         latent_dim (int): gaussian dimensions
         locally_connected_channels = 2
-    # Arguments
-        <none>
-    # Returns
-        retina: the input layer
-        encoder: the encoder model
-        shape: shape of last input layer
-        [z_mean, z_log_var, z]: tensors for latent space
+
+        size (int, optional):
+            input is size x size. Defaults to 64.
+        latent_dim (int, optional):
+            dimension of gaussian blob. Defaults to 8.
+        locally_connected_channels (int, optional):
+            channels on locally connected layer. Defaults to 2.
+        act_func (str, optional):
+            activation function for most layers. Defaults to "softplus".
+
+    Returns:
+        Sequential: encoder model
     """
 
     return Sequential(
@@ -262,15 +276,15 @@ def log_normal_pdf(sample, mean, logvar, raxis=1):
 
 
 # @traced
-def reparameterize(mean, logvar):
-    """[summary]
+def reparameterize(mean: tf.Tensor, logvar: tf.Tensor):
+    """parameter trick allows training of the VAE
 
     Args:
-        mean ([type]): [description]
-        logvar ([type]): [description]
+        mean ([tf.Tensor]): gaussian means
+        logvar ([tf.Tensor]): gaussian log variance
 
     Returns:
-        [type]: [description]
+        tf.Tensor: sampled vector
     """
     eps = tf.random.normal(shape=mean.shape)
     return eps * tf.exp(logvar * 0.5) + mean
@@ -302,11 +316,23 @@ def compute_loss(encoder: Sequential, decoder: Sequential, value: tf.Tensor):
 
 
 @tf.function
-def train_step(encoder, decoder, x_samples, optimizer):
+def train_step(
+    encoder: tf.keras.models.Model,
+    decoder: tf.keras.models.Model,
+    x_samples: tf.Tensor,
+    optimizer: tf.optimizers.Optimizer,
+):
     """Executes one training step and returns the loss.
     This function computes the loss and gradients, and uses the latter to
     update the model's parameters.
+
+    Args:
+        encoder ([type]): [description]
+        decoder ([type]): [description]
+        x_samples ([type]): [description]
+        optimizer ([type]): [description]
     """
+
     all_trainable_variables = encoder.trainable_variables + decoder.trainable_variables
     with tf.GradientTape() as tape:
         loss = compute_loss(encoder, decoder, x_samples)
@@ -318,7 +344,16 @@ def train_step(encoder, decoder, x_samples, optimizer):
 def generate_batches(
     input_data: np.ndarray, batch_size: int
 ) -> Generator[np.ndarray, None, None]:
-    """Batches and trains using a given function"""
+    """Batches and trains using a given function
+
+    Args:
+        input_data (np.ndarray): [description]
+        batch_size (int): [description]
+
+    Yields:
+        Generator[np.ndarray, None, None]: [description]
+    """
+
     step = 0
     while (step + 1) * batch_size < input_data.shape[0]:
         input_batch = input_data[step * batch_size : (step + 1) * batch_size, ...]
@@ -330,8 +365,18 @@ def forall_batch(
     input_batches: Generator[np.ndarray, None, None],
     train_func: Callable[[np.ndarray], None],
     tb_callback=None,
-):
-    """Batches and trains using a given function"""
+) -> float:
+    """Batches and trains using a given function
+
+    Args:
+        input_batches (Generator[np.ndarray, None, None]): [description]
+        train_func (Callable[[np.ndarray], None]): [description]
+        tb_callback ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        float: elapsed time for batch
+    """
+
     start_time = time()
     logs = {"loss": None, "mean_absolute_error": None, "output": None}
     for step, input_batch in input_batches:
@@ -350,20 +395,24 @@ def forall_batch(
 
 
 class ZebraStackModel:
-    """[summary]"""
+    """encapsulates the zebrastack VAE model"""
 
-    def __init__(self, latent_dim=8):
-        self.encoder = create_encoder_v1(latent_dim=latent_dim)
+    def __init__(self, latent_dim=8, use_v2=False):
+        if use_v2:
+            self.encoder = create_encoder_v2(latent_dim=latent_dim)
+        else:
+            self.encoder = create_encoder_v1(latent_dim=latent_dim)
         dense_shape = self.encoder.get_layer("ait_local").output_shape
         self.decoder = create_decoder(dense_shape, latent_dim=latent_dim)
 
-    def train(self, train_images, test_images):
+    def train(self, train_images: tf.Tensor, test_images: tf.Tensor):
         """[summary]
 
         Args:
-            train_images ([type]): [description]
-            test_images ([type]): [description]
+            train_images (tf.Tensor): [description]
+            test_images (tf.Tensor): [description]
         """
+
         log_dir = Path(".") / "logs" / "fit" / datetime.now().strftime("%Y%m%d-%H%M%S")
         logging.info(log_dir)
 
@@ -407,7 +456,7 @@ class ZebraStackModel:
         if tb_callback:
             tb_callback.on_train_end()
 
-    def recognize(self, image):
+    def recognize(self, image: tf.Tensor):
         """[summary]
 
         Args:
@@ -415,7 +464,7 @@ class ZebraStackModel:
         """
         return self.encoder(image)
 
-    def generate(self, latent):
+    def generate(self, latent: tf.Tensor):
         """[summary]
 
         Args:
@@ -440,5 +489,6 @@ if __name__ == "__main__":
     # now do training
     model.train(_train_images, _test_images)
 
-    # model.recognize(_test_images)
-    # model.generate(latent)
+    # try a recognize / generate loop
+    _test_latent = model.recognize(_test_images[:10,...])
+    _re_test_images = model.generate(_test_latent)
