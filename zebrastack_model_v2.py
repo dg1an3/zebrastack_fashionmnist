@@ -10,7 +10,7 @@ from datetime import datetime
 import logging
 from time import time
 from pathlib import Path
-from typing import Callable, Generator
+from typing import Callable, Generator, Optional
 
 from autologging import logged
 import numpy as np
@@ -361,43 +361,16 @@ def generate_batches(
         step += 1
 
 
-def forall_batch(
-    input_batches: Generator[np.ndarray, None, None],
-    train_func: Callable[[np.ndarray], None],
-    tb_callback=None,
-) -> float:
-    """Batches and trains using a given function
+class ZebraStackModel:
+    """encapsulates the zebrastack VAE model
 
     Args:
-        input_batches (Generator[np.ndarray, None, None]): [description]
-        train_func (Callable[[np.ndarray], None]): [description]
-        tb_callback ([type], optional): [description]. Defaults to None.
-
-    Returns:
-        float: elapsed time for batch
+        latent_dim (int, optional): [description]. Defaults to 8.
+        use_v2 (bool, optional): [description]. Defaults to False.
     """
 
-    start_time = time()
-    logs = {"loss": None, "mean_absolute_error": None, "output": None}
-    for step, input_batch in input_batches:
-        if not step % 10000:
-            logging.info(f"{step}: {input_batch.shape}")
-
-        if tb_callback:
-            tb_callback.on_train_batch_begin(step, logs=logs)
-
-        train_func(input_batch)
-
-        if tb_callback:
-            tb_callback.on_train_batch_end(step, logs=logs)
-    end_time = time()
-    return end_time - start_time
-
-
-class ZebraStackModel:
-    """encapsulates the zebrastack VAE model"""
-
     def __init__(self, latent_dim=8, use_v2=False):
+        self.latent_dim = latent_dim
         if use_v2:
             self.encoder = create_encoder_v2(latent_dim=latent_dim)
         else:
@@ -405,7 +378,12 @@ class ZebraStackModel:
         dense_shape = self.encoder.get_layer("ait_local").output_shape
         self.decoder = create_decoder(dense_shape, latent_dim=latent_dim)
 
-    def train(self, train_images: tf.Tensor, test_images: tf.Tensor):
+    def train(
+        self,
+        train_images: tf.Tensor,
+        test_images: tf.Tensor,
+        callback: Optional[tf.keras.callbacks.Callback] = None,
+    ):
         """[summary]
 
         Args:
@@ -416,79 +394,173 @@ class ZebraStackModel:
         log_dir = Path(".") / "logs" / "fit" / datetime.now().strftime("%Y%m%d-%H%M%S")
         logging.info(log_dir)
 
-        tb_callback = (
-            None  # tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-        )
-        if tb_callback:
-            tb_callback.set_model(self.encoder)
-            # logs = {"loss": None, "mean_absolute_error": None, "output": None}
-            tb_callback.on_train_begin()
+        # this will carry intermediate results to the callback
+        logs = {"loss": None, "reconstructed": None}
+
+        if callback:
+            callback.set_model(self.encoder)
+            callback.on_train_begin(logs=logs)
 
         batch_size = 16
         optimizer = tf.keras.optimizers.Adam(1e-4)
         loss = tf.keras.metrics.Mean()
         for epoch in range(1, 121):
-            if tb_callback:
-                tb_callback.on_epoch_begin(epoch)
+            if callback:
+                callback.on_epoch_begin(epoch, logs=logs)
 
             # perform training
             train_batches = generate_batches(train_images, batch_size)
-            time_elapsed = forall_batch(
-                train_batches,
-                lambda batch: train_step(self.encoder, self.decoder, batch, optimizer),
-            )
+            start_time = time()
+            for step, input_batch in train_batches:
+                if not step % 10000:
+                    logging.info(f"{step}: {input_batch.shape}")
+
+                train_step(self.encoder, self.decoder, input_batch, optimizer)
+
+            end_time = time()
+            time_elapsed = end_time - start_time
 
             # calculate test results
-            test_batches = generate_batches(test_images, 16)
+            test_batches = generate_batches(test_images, batch_size)
             loss.reset_states()
-            forall_batch(
-                test_batches,
-                lambda batch: loss(compute_loss(self.encoder, self.decoder, batch)),
-            )
+            for step, test_batch in test_batches:
+                if step == 0:
+                    logs["original"] = test_batch
+                    logs["reconstructed"] = self.generate(self.recognize(test_batch))
+                loss(compute_loss(self.encoder, self.decoder, test_batch))
+
             elbo = -loss.result().numpy()
+            logs["loss"] = elbo
+
+            if callback:
+                callback.on_epoch_end(epoch, logs=logs)
+
             logging.info(
                 f"Epoch: {epoch}, test ELBO: {elbo}, time elapsed: {time_elapsed}"
             )
 
-            if tb_callback:
-                tb_callback.on_epoch_end(epoch)
+        if callback:
+            callback.on_train_end(logs=logs)
 
-        if tb_callback:
-            tb_callback.on_train_end()
+    def recognize(self, image: tf.Tensor) -> tf.Tensor:
+        """processes an image (4-d tensor, so can be a batch)
+        returns latent variable, but only mean part
 
-    def recognize(self, image: tf.Tensor):
+        Args:
+            image (tf.Tensor):
+                input tensor to be recognized
+
+        Returns:
+            tf.Tensor:
+                tensor of latent_dim size, representing the encodings of the input tensors
+        """
+        encoder_output = self.encoder(image)
+        return encoder_output[..., 0 : self.latent_dim]
+
+    def generate(self, latent: tf.Tensor) -> tf.Tensor:
+        """generates a tensor from the given latent tensor
+
+        Args:
+            latent (tf.Tensor):
+                [description]
+
+        Returns:
+            tf.Tensor:
+                [description]
+        """
+        assert latent.shape[-1] == self.latent_dim
+
+        sigmoid = lambda x: np.exp(-np.logaddexp(0, -x))
+        sigmoid_generated = sigmoid(self.decoder(latent))
+
+        return sigmoid_generated
+
+
+class NotebookCallback(tf.keras.callbacks.Callback):
+    """[summary]
+
+    Args:
+        figure ([type]): [description]
+    """
+
+    def __init__(self):
+        self.figure, self.axes = plt.subplots(2, 10, figsize=(15, 3))
+
+    def on_train_batch_end(self, batch: int, logs: dict = None):
         """[summary]
 
         Args:
-            image ([type]): [description]
+            batch (int): [description]
+            logs ([type], optional): [description]. Defaults to None.
         """
-        return self.encoder(image)
+        pass
 
-    def generate(self, latent: tf.Tensor):
+    def on_epoch_end(self, epoch: int, logs: dict = None):
         """[summary]
 
         Args:
-            latent ([type]): [description]
+            epoch (int): [description]
+            logs (dict, optional): [description]. Defaults to None.
         """
-        return self.decoder(latent)
+        loss = logs["loss"]
+        original = logs["original"]
+        reconstructed = logs["reconstructed"]
+
+        quantiles = [0.05, 0.95]
+
+        for n in range(10):
+            q_test = np.quantile(original[n], quantiles)
+            self.axes[0][n].imshow(
+                original[n], cmap="gray", vmin=q_test[0], vmax=q_test[1]
+            )
+
+            reshape_test_image = np.reshape(reconstructed[n], (64, 64))
+            q_re = np.quantile(reshape_test_image, quantiles)
+            self.axes[1][n].imshow(
+                reshape_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
+            )
+
+        self.figure.savefig(f"{epoch}-figure.png")
+
+        logging.info(f"{epoch}: loss={loss} reconstructed={reconstructed.shape}")
 
 
 if __name__ == "__main__":
-    logging.basicConfig()
-    
+    import sys
+    import matplotlib.pyplot as plt
+
+    logging.basicConfig(
+        level=logging.DEBUG,
+        stream=sys.stdout,
+        format="%(asctime)s %(message)s",
+        datefmt="%Y-%m-%d %I:%M:%S %p",
+    )
+    logging.info(f"tensorflow version = {tf.version.VERSION}")
+
     model = ZebraStackModel(latent_dim=8)
     model.encoder.summary()
     model.decoder.summary()
 
+    # load the fashion mnist dataset
     (_train_images, _), (
         _test_images,
         _,
     ) = tf.keras.datasets.fashion_mnist.load_data()
-    _train_images, _test_images = _train_images[: len(_train_images) // 1], _test_images[: len(_test_images) // 1]
+
+    # select a subset
+    _train_images, _test_images = (
+        _train_images[: len(_train_images) // 1, ...],
+        _test_images[: len(_test_images) // 1, ...],
+    )
+
+    # prepare the images for tarining
+    _train_images = prepare_images(_train_images)
+    _test_images = prepare_images(_test_images)
     logging.info(f"train_images: {_train_images.shape} {_train_images.dtype}")
 
     # now do training
-    model.train(_train_images, _test_images)
+    nb_callback = NotebookCallback()
+    model.train(_train_images, _test_images, callback=nb_callback)
 
     # try a recognize / generate loop
     _test_latent = model.recognize(_test_images[:10, ...])
