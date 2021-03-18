@@ -102,14 +102,14 @@ def make_gabor_kernels(x_grid, y_grid, directions=3, freqs=[2.0, 1.0]) -> tf.Ten
 class GaborPowerMap2D(Layer):
     """[summary]"""
 
-    def __init__(self, directions=3, freqs=[2.0, 1.0], sz=13, **kwargs):
+    def __init__(self, directions=3, freqs=[2.0, 1.0], size=13, **kwargs):
 
         super(GaborPowerMap2D, self).__init__(
             trainable=False, activity_regularizer=None, **kwargs
         )
         self.directions = directions
         self.freqs = freqs
-        self.sz = sz
+        self.size = size
 
     def build(self, input_shape):
         """[summary]
@@ -118,9 +118,9 @@ class GaborPowerMap2D(Layer):
             input_shape ([type]): [description]
         """
         # computer gabor filter bank
-        xs, ys = make_meshgrid(size=self.sz)
+        x_grid, y_grid = make_meshgrid(size=self.size)
         kernels = make_gabor_kernels(
-            xs, ys, directions=self.directions, freqs=self.freqs
+            x_grid, y_grid, directions=self.directions, freqs=self.freqs
         )
         self._real_kernels = tf.math.real(kernels)
         self._imag_kernels = tf.math.imag(kernels)
@@ -144,20 +144,21 @@ class GaborPowerMap2D(Layer):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    directions = 5
-    freqs = [2.0, 1.0]
+    for_dir = 5
+    for_freq = [2.0, 1.0]
     _x_grid, _y_grid = make_meshgrid(size=9)
     gabor_kernels = make_gabor_kernels(
-        _x_grid, _y_grid, directions=directions, freqs=freqs
+        _x_grid, _y_grid, directions=for_dir, freqs=for_freq
     )
 
     _, axs = plt.subplots(
-        len(freqs) + 1, directions, figsize=(directions * 3, len(freqs) * 3)
+        len(for_freq) + 1, for_dir, figsize=(for_dir * 3, len(for_freq) * 3)
     )
-    for n in range(directions):
-        for m in range(len(freqs)):
-            img = tf.squeeze(gabor_kernels[..., 0, m * directions + n])
+    for n in range(for_dir):
+        for m in range(len(for_freq)):
+            img = tf.squeeze(gabor_kernels[..., 0, m * for_dir + n])
             axs[m][n].imshow(tf.math.real(img), cmap="plasma")
-    g0 = tf.squeeze(gabor_kernels[..., 0, -1])
-    for n in range(directions):
-        axs[len(freqs)][n].imshow(tf.squeeze(g0))
+
+    _g0 = tf.squeeze(gabor_kernels[..., 0, -1])
+    for n in range(for_dir):
+        axs[len(for_freq)][n].imshow(tf.squeeze(_g0))
