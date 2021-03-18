@@ -1,7 +1,11 @@
+"""[summary]
+"""
+import numpy as np
 import tensorflow as tf
 from tensorflow_addons.utils.keras_utils import normalize_tuple
 from tensorflow.keras.layers import Layer, InputSpec
 import tensorflow.keras.backend as K
+import logging
 
 
 def normalize_data_format(value):
@@ -122,10 +126,9 @@ def logsumexp_pool(
 
 
 class LogSumExpPooling2D(Layer):
-    """Pooling layer for arbitrary pooling functions, for 2D inputs (e.g. images).
-    This class only exists for code reuse. It will never be an exposed API.
+    """SoftMax pooling layer for performing continuous approximation of max
+
     Args:
-      pool_function: The pooling function to apply, e.g. `tf.nn.max_pool2d`.
       pool_size: An integer or tuple/list of 2 integers: (pool_height, pool_width)
         specifying the size of the pooling window.
         Can be a single integer to specify the same value for
@@ -164,7 +167,20 @@ class LogSumExpPooling2D(Layer):
         self.data_format = normalize_data_format(data_format)
         self.input_spec = InputSpec(ndim=4)
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        """evalute the layer for given input
+
+        Args:
+            inputs (tf.Tensor):
+                input tensor to be evaluated
+                expected 4-dimensional
+
+        Returns:
+            tf.Tensor: result of applying the softmax
+        """
+        if len(inputs.shape) != 4:
+            raise ValueError("expecting 4-dimensional tensor")
+
         if self.data_format == "channels_last":
             pool_shape = (1,) + self.pool_size + (1,)
             strides = (1,) + self.strides + (1,)
@@ -181,6 +197,14 @@ class LogSumExpPooling2D(Layer):
         return outputs
 
     def compute_output_shape(self, input_shape):
+        """[summary]
+
+        Args:
+            input_shape ([type]): [description]
+
+        Returns:
+            [type]: [description]
+        """
         input_shape = tf.TensorShape(input_shape).as_list()
         if self.data_format == "channels_first":
             rows = input_shape[2]
@@ -200,6 +224,11 @@ class LogSumExpPooling2D(Layer):
             return tf.TensorShape([input_shape[0], rows, cols, input_shape[3]])
 
     def get_config(self):
+        """[summary]
+
+        Returns:
+            [type]: [description]
+        """
         config = {
             "pool_size": self.pool_size,
             "padding": self.padding,
@@ -213,5 +242,6 @@ class LogSumExpPooling2D(Layer):
 if __name__ == "__main__":
     lse_layer = LogSumExpPooling2D()
 
-    input = tf.constant([[0.0, 0.0, 0.0]])
+    input = tf.constant(np.zeros((1, 4, 4, 1)))
     result = lse_layer(input)
+    logging.info(result)
