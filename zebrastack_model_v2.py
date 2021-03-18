@@ -474,21 +474,22 @@ class ZebraStackModel:
 
 
 if __name__ == "__main__":
+    logging.basicConfig()
+    
     model = ZebraStackModel(latent_dim=8)
     model.encoder.summary()
     model.decoder.summary()
 
-    (_train_images, _train_labels), (
+    (_train_images, _), (
         _test_images,
-        _test_labels,
+        _,
     ) = tf.keras.datasets.fashion_mnist.load_data()
-    _train_images = _train_images[: len(_train_images) // 1]
-    _test_images = _test_images[: len(_test_images) // 1]
+    _train_images, _test_images = _train_images[: len(_train_images) // 1], _test_images[: len(_test_images) // 1]
     logging.info(f"train_images: {_train_images.shape} {_train_images.dtype}")
 
     # now do training
     model.train(_train_images, _test_images)
 
     # try a recognize / generate loop
-    _test_latent = model.recognize(_test_images[:10,...])
+    _test_latent = model.recognize(_test_images[:10, ...])
     _re_test_images = model.generate(_test_latent)
