@@ -1,8 +1,10 @@
 """various utility functions
 """
+from typing import Generator, Union
+import numpy as np
 
 
-def normalize_tuple(value, n, name):
+def normalize_tuple(value: Union[int, tuple], n:int, name):
     """Transforms an integer or iterable of integers into an integer tuple.
 
     A copy of tensorflow.python.keras.util.
@@ -145,3 +147,23 @@ def conv_output_length(input_length, filter_size, padding, stride, dilation=1):
 
     output_length = output_length_calculator[padding]()
     return (output_length + stride - 1) // stride
+
+
+def generate_batches(
+    input_data: np.ndarray, batch_size: int
+) -> Generator[np.ndarray, None, None]:
+    """Batches and trains using a given function
+
+    Args:
+        input_data (np.ndarray): [description]
+        batch_size (int): [description]
+
+    Yields:
+        Generator[np.ndarray, None, None]: [description]
+    """
+
+    step = 0
+    while (step + 1) * batch_size < input_data.shape[0]:
+        input_batch = input_data[step * batch_size : (step + 1) * batch_size, ...]
+        yield step, input_batch
+        step += 1

@@ -36,6 +36,7 @@ from tensorflow.keras.models import Sequential
 from gabor_powermap_2d import OrientedPowerMap2D
 from logsumexp_pooling_2d import LogSumExpPooling2D
 from figure_callback import FigureCallback
+from tensor_utils import generate_batches
 
 
 @logged
@@ -106,12 +107,11 @@ def create_encoder_v1(
             Conv2D(64, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
             LocallyConnected2D(
                 locally_connected_channels,
-                (5, 5),
+                (3, 3),
                 name="ait_local",
                 activation=act_func,
-                kernel_regularizer=l1_l2(0.1, 0.1),
+                kernel_regularizer=l1_l2(0.5, 0.5),
             ),
-            ActivityRegularization(l1=0.0e-4, l2=0.0e-4, name="ait_regular"),
             ####
             #### Pulvinar
             # generate latent vector Q(z|X)
@@ -158,41 +158,30 @@ def create_encoder_v2(
             OrientedPowerMap2D(
                 directions=3, freqs=[2.0, 1.0], size=5, name="v1_powmap"
             ),
-            LogSumExpPooling2D(name="v1_pool"),
-            Conv2D(
-                3, (1, 1), activation=act_func
-            ),  # we want 3 channels after the reduction
+            MaxPooling2D(name="v1_pool"),
+            # Conv2D(
+            #     3, (1, 1), activation=act_func
+            # ),  # we want 3 channels after the reduction
             SpatialDropout2D(0.1, name="v1_dropout"),
             ####
             #### V2 layers
-            OrientedPowerMap2D(
-                directions=3, freqs=[2.0, 1.0], size=3, name="v2_powmap"
-            ),
-            LogSumExpPooling2D(name="v2_pool"),
-            Conv2D(
-                3, (1, 1), activation=act_func
-            ),  # we want 3 channels after the reduction
+            Conv2D(16, (3, 3), name="v2_conv2d", activation=act_func, padding="same"),
+            MaxPooling2D((2, 2), name="v2_maxpool", padding="same"),
             ####
             #### V4 layers
-            OrientedPowerMap2D(
-                directions=3, freqs=[2.0, 1.0], size=3, name="v4_powmap"
-            ),
-            LogSumExpPooling2D(name="v4_pool"),
-            Conv2D(
-                3, (1, 1), activation=act_func
-            ),  # we want 3 channels after the reduction
+            Conv2D(32, (3, 3), name="v4_conv2d", activation=act_func, padding="same"),
+            MaxPooling2D((2, 2), name="v4_maxpool", padding="same"),
             ####
             #### IT Layers
             Conv2D(32, (3, 3), name="pit_conv2d", activation=act_func, padding="same"),
             Conv2D(64, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
             LocallyConnected2D(
                 locally_connected_channels,
-                (5, 5),
+                (3, 3),
                 name="ait_local",
                 activation=act_func,
-                kernel_regularizer=l1_l2(l1=0.01, l2=0.01),
+                kernel_regularizer=l1_l2(l1=0.5, l2=0.5),
             ),
-            # ActivityRegularization(l1=0.0e-4, l2=0.0e-4, name="ait_regular"),
             ####
             #### Pulvinar
             # generate latent vector Q(z|X)
@@ -237,10 +226,10 @@ def create_decoder(
             ZeroPadding2D(padding=(1, 1), name="ait_padding_back"),
             LocallyConnected2D(
                 locally_connected_channels,
-                (5, 5),
+                (3, 3),
                 name="ait_local_back",
                 activation=act_func,
-                kernel_regularizer=l1_l2(0.1, 0.1),
+                kernel_regularizer=l1_l2(0.5, 0.5),
             ),
             ZeroPadding2D(padding=(1, 1), name="cit_padding_back"),
             Conv2DTranspose(
@@ -359,26 +348,6 @@ def train_step(
         # tf.print(f"loss value = {loss}")
     gradients = tape.gradient(loss, all_trainable_variables)
     optimizer.apply_gradients(zip(gradients, all_trainable_variables))
-
-
-def generate_batches(
-    input_data: np.ndarray, batch_size: int
-) -> Generator[np.ndarray, None, None]:
-    """Batches and trains using a given function
-
-    Args:
-        input_data (np.ndarray): [description]
-        batch_size (int): [description]
-
-    Yields:
-        Generator[np.ndarray, None, None]: [description]
-    """
-
-    step = 0
-    while (step + 1) * batch_size < input_data.shape[0]:
-        input_batch = input_data[step * batch_size : (step + 1) * batch_size, ...]
-        yield step, input_batch
-        step += 1
 
 
 class ZebraStackModel:
@@ -512,20 +481,10 @@ if __name__ == "__main__":
 
     # create it if it isn't there
     log_dir = Path(".") / "logs" / "figures" / datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir.mkdir(parents=True, exist_ok=False)
     logging.info(f"Logging to directory: {log_dir}")
 
     # create the model and write it out
-    model = ZebraStackModel(latent_dim=8)
-    encoder_fn = log_dir / "encoder_summary.txt"
-    with open(encoder_fn, "wt") as f:
-        model.encoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
-    logging.info(f"Write encoder summary to {encoder_fn}")
-
-    decoder_fn = log_dir / "decoder_summary.txt"
-    with open(decoder_fn, "wt") as f:
-        model.decoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
-    logging.info(f"Write decoder summary to {decoder_fn}")
+    model = ZebraStackModel(latent_dim=8, use_v2=True)
 
     # load the fashion mnist dataset
     (_train_images, _), (
@@ -539,7 +498,7 @@ if __name__ == "__main__":
         _test_images[: len(_test_images) // 1, ...],
     )
 
-    # prepare the images for tarining
+    # prepare the images for training
     _train_images = prepare_images(_train_images)
     _test_images = prepare_images(_test_images)
     logging.info(f"train_images: {_train_images.shape} {_train_images.dtype}")
@@ -547,8 +506,19 @@ if __name__ == "__main__":
     # now do training
     nb_callback = FigureCallback(log_dir)
     model.train(
-        _train_images, _test_images, batch_size=16, epoch_count=15, callback=nb_callback
+        _train_images, _test_images, batch_size=16, epoch_count=25, callback=nb_callback
     )
 
     # now save the model to the log location
+    log_dir.mkdir(parents=True, exist_ok=False)
+
+    encoder_fn = log_dir / "encoder_summary.txt"
+    with open(encoder_fn, "wt") as f:
+        model.encoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
+    logging.info(f"Write encoder summary to {encoder_fn}")
+
+    decoder_fn = log_dir / "decoder_summary.txt"
+    with open(decoder_fn, "wt") as f:
+        model.decoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
+    logging.info(f"Write decoder summary to {decoder_fn}")
     model.save_model(log_dir)
