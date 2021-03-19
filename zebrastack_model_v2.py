@@ -30,10 +30,12 @@ from tensorflow.keras.layers import (
     ActivityRegularization,
     Reshape,
 )
+from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.models import Sequential
 
-from gabor_powermap_2d import GaborPowerMap2D
+from gabor_powermap_2d import OrientedPowerMap2D
 from logsumexp_pooling_2d import LogSumExpPooling2D
+from figure_callback import FigureCallback
 
 
 @logged
@@ -104,9 +106,10 @@ def create_encoder_v1(
             Conv2D(64, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
             LocallyConnected2D(
                 locally_connected_channels,
-                (3, 3),
+                (5, 5),
                 name="ait_local",
                 activation=act_func,
+                kernel_regularizer=l1_l2(0.1, 0.1),
             ),
             ActivityRegularization(l1=0.0e-4, l2=0.0e-4, name="ait_regular"),
             ####
@@ -152,28 +155,44 @@ def create_encoder_v2(
             Input(shape=(size, size, 1), name="retina_{}".format(size)),
             ####
             #### V1 layers
-            GaborPowerMap2D(16, (5, 5), name="v1_powmap"),
+            OrientedPowerMap2D(
+                directions=3, freqs=[2.0, 1.0], size=5, name="v1_powmap"
+            ),
             LogSumExpPooling2D(name="v1_pool"),
+            Conv2D(
+                3, (1, 1), activation=act_func
+            ),  # we want 3 channels after the reduction
             SpatialDropout2D(0.1, name="v1_dropout"),
             ####
             #### V2 layers
-            GaborPowerMap2D(16, (3, 3), name="v2_powmap"),
+            OrientedPowerMap2D(
+                directions=3, freqs=[2.0, 1.0], size=3, name="v2_powmap"
+            ),
             LogSumExpPooling2D(name="v2_pool"),
+            Conv2D(
+                3, (1, 1), activation=act_func
+            ),  # we want 3 channels after the reduction
             ####
             #### V4 layers
-            GaborPowerMap2D(32, (3, 3), name="v4_powmap"),
+            OrientedPowerMap2D(
+                directions=3, freqs=[2.0, 1.0], size=3, name="v4_powmap"
+            ),
             LogSumExpPooling2D(name="v4_pool"),
+            Conv2D(
+                3, (1, 1), activation=act_func
+            ),  # we want 3 channels after the reduction
             ####
             #### IT Layers
             Conv2D(32, (3, 3), name="pit_conv2d", activation=act_func, padding="same"),
             Conv2D(64, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
             LocallyConnected2D(
                 locally_connected_channels,
-                (3, 3),
+                (5, 5),
                 name="ait_local",
                 activation=act_func,
+                kernel_regularizer=l1_l2(l1=0.01, l2=0.01),
             ),
-            ActivityRegularization(l1=0.0e-4, l2=0.0e-4, name="ait_regular"),
+            # ActivityRegularization(l1=0.0e-4, l2=0.0e-4, name="ait_regular"),
             ####
             #### Pulvinar
             # generate latent vector Q(z|X)
@@ -218,9 +237,10 @@ def create_decoder(
             ZeroPadding2D(padding=(1, 1), name="ait_padding_back"),
             LocallyConnected2D(
                 locally_connected_channels,
-                (3, 3),
+                (5, 5),
                 name="ait_local_back",
                 activation=act_func,
+                kernel_regularizer=l1_l2(0.1, 0.1),
             ),
             ZeroPadding2D(padding=(1, 1), name="cit_padding_back"),
             Conv2DTranspose(
@@ -382,6 +402,8 @@ class ZebraStackModel:
         self,
         train_images: tf.Tensor,
         test_images: tf.Tensor,
+        batch_size: int = 16,
+        epoch_count: int = 10,
         callback: Optional[tf.keras.callbacks.Callback] = None,
     ):
         """[summary]
@@ -391,9 +413,6 @@ class ZebraStackModel:
             test_images (tf.Tensor): [description]
         """
 
-        log_dir = Path(".") / "logs" / "fit" / datetime.now().strftime("%Y%m%d-%H%M%S")
-        logging.info(log_dir)
-
         # this will carry intermediate results to the callback
         logs = {"loss": None, "reconstructed": None}
 
@@ -401,10 +420,9 @@ class ZebraStackModel:
             callback.set_model(self.encoder)
             callback.on_train_begin(logs=logs)
 
-        batch_size = 16
         optimizer = tf.keras.optimizers.Adam(1e-4)
         loss = tf.keras.metrics.Mean()
-        for epoch in range(1, 121):
+        for epoch in range(1, epoch_count):
             if callback:
                 callback.on_epoch_begin(epoch, logs=logs)
 
@@ -475,54 +493,9 @@ class ZebraStackModel:
 
         return sigmoid_generated
 
-
-class NotebookCallback(tf.keras.callbacks.Callback):
-    """[summary]
-
-    Args:
-        figure ([type]): [description]
-    """
-
-    def __init__(self):
-        self.figure, self.axes = plt.subplots(2, 10, figsize=(15, 3))
-
-    def on_train_batch_end(self, batch: int, logs: dict = None):
-        """[summary]
-
-        Args:
-            batch (int): [description]
-            logs ([type], optional): [description]. Defaults to None.
-        """
-        pass
-
-    def on_epoch_end(self, epoch: int, logs: dict = None):
-        """[summary]
-
-        Args:
-            epoch (int): [description]
-            logs (dict, optional): [description]. Defaults to None.
-        """
-        loss = logs["loss"]
-        original = logs["original"]
-        reconstructed = logs["reconstructed"]
-
-        quantiles = [0.05, 0.95]
-
-        for n in range(10):
-            q_test = np.quantile(original[n], quantiles)
-            self.axes[0][n].imshow(
-                original[n], cmap="gray", vmin=q_test[0], vmax=q_test[1]
-            )
-
-            reshape_test_image = np.reshape(reconstructed[n], (64, 64))
-            q_re = np.quantile(reshape_test_image, quantiles)
-            self.axes[1][n].imshow(
-                reshape_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
-            )
-
-        self.figure.savefig(f"{epoch}-figure.png")
-
-        logging.info(f"{epoch}: loss={loss} reconstructed={reconstructed.shape}")
+    def save_model(self, path):
+        self.encoder.save(path / "encoder")
+        self.decoder.save(path / "decoder")
 
 
 if __name__ == "__main__":
@@ -537,9 +510,22 @@ if __name__ == "__main__":
     )
     logging.info(f"tensorflow version = {tf.version.VERSION}")
 
+    # create it if it isn't there
+    log_dir = Path(".") / "logs" / "figures" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir.mkdir(parents=True, exist_ok=False)
+    logging.info(f"Logging to directory: {log_dir}")
+
+    # create the model and write it out
     model = ZebraStackModel(latent_dim=8)
-    model.encoder.summary()
-    model.decoder.summary()
+    encoder_fn = log_dir / "encoder_summary.txt"
+    with open(encoder_fn, "wt") as f:
+        model.encoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
+    logging.info(f"Write encoder summary to {encoder_fn}")
+
+    decoder_fn = log_dir / "decoder_summary.txt"
+    with open(decoder_fn, "wt") as f:
+        model.decoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
+    logging.info(f"Write decoder summary to {decoder_fn}")
 
     # load the fashion mnist dataset
     (_train_images, _), (
@@ -559,9 +545,10 @@ if __name__ == "__main__":
     logging.info(f"train_images: {_train_images.shape} {_train_images.dtype}")
 
     # now do training
-    nb_callback = NotebookCallback()
-    model.train(_train_images, _test_images, callback=nb_callback)
+    nb_callback = FigureCallback(log_dir)
+    model.train(
+        _train_images, _test_images, batch_size=16, epoch_count=15, callback=nb_callback
+    )
 
-    # try a recognize / generate loop
-    _test_latent = model.recognize(_test_images[:10, ...])
-    _re_test_images = model.generate(_test_latent)
+    # now save the model to the log location
+    model.save_model(log_dir)

@@ -99,14 +99,18 @@ def make_gabor_kernels(x_grid, y_grid, directions=3, freqs=[2.0, 1.0]) -> tf.Ten
     return tf.concat([bank, g0], -1)
 
 
-class GaborPowerMap2D(Layer):
-    """[summary]"""
+class OrientedPowerMap2D(Layer):
+    """creates a stacked gabor filter bank that is non-trainable
+
+    Args:
+        directions (int, optional): [description]. Defaults to 3.
+        freqs (list, optional): [description]. Defaults to [2.0, 1.0].
+        size (int, optional): [description]. Defaults to 13.
+    """
 
     def __init__(self, directions=3, freqs=[2.0, 1.0], size=13, **kwargs):
 
-        super(GaborPowerMap2D, self).__init__(
-            trainable=False, activity_regularizer=None, **kwargs
-        )
+        super().__init__(trainable=False, activity_regularizer=None, **kwargs)
         self.directions = directions
         self.freqs = freqs
         self.size = size
