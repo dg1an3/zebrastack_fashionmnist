@@ -36,7 +36,7 @@ from tensorflow.keras.models import Sequential
 from gabor_powermap_2d import OrientedPowerMap2D
 from logsumexp_pooling_2d import LogSumExpPooling2D
 from figure_callback import FigureCallback
-from tensor_utils import generate_batches
+from tensor_utils import configure_logger, generate_batches
 
 
 @logged
@@ -466,49 +466,27 @@ class ZebraStackModel:
         return sigmoid_generated
 
     def save_model(self, path):
+        """[summary]
+
+        Args:
+            path ([type]): [description]
+        """
         self.encoder.save(path / "encoder")
         self.decoder.save(path / "decoder")
 
 
 if __name__ == "__main__":
-    import sys
     import matplotlib.pyplot as plt
 
-    # create it if it isn't there
-    log_dir = Path(".") / "logs" / "figures" / datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    logging.info(f"Logging to directory: {log_dir}")
-
-    rootLogger = logging.getLogger()
-    rootLogger.setLevel(logging.DEBUG)
-
-    logFormatter = logging.Formatter(
-        "%(asctime)s %(message)s", datefmt="%Y-%m-%d %I:%M:%S %p"
-    )
-
-    fileHandler = logging.FileHandler(log_dir / "output.log")
-    fileHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(fileHandler)
-
-    consoleHandler = logging.StreamHandler(stream=sys.stdout)
-    consoleHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(consoleHandler)
-
+    log_dir = configure_logger("figures")
     logging.info(f"tensorflow version = {tf.version.VERSION}")
 
     # create the model and write it out
     model = ZebraStackModel(latent_dim=8, use_v2=True)
 
     # write model summaries to the log location
-    encoder_fn = log_dir / "encoder_summary.txt"
-    with open(encoder_fn, "wt") as f:
-        model.encoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
-    logging.info(f"Write encoder summary to {encoder_fn}")
-
-    decoder_fn = log_dir / "decoder_summary.txt"
-    with open(decoder_fn, "wt") as f:
-        model.decoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
-    logging.info(f"Write decoder summary to {decoder_fn}")
+    model.encoder.summary(print_fn=logging.info)
+    model.decoder.summary(print_fn=logging.info)
 
     # load the fashion mnist dataset
     (_train_images, _), (

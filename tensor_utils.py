@@ -1,10 +1,47 @@
 """various utility functions
 """
+import sys
+from datetime import datetime
+import logging
+from pathlib import Path
 from typing import Generator, Union
 import numpy as np
 
 
-def normalize_tuple(value: Union[int, tuple], n:int, name):
+def configure_logger(subdir: str):
+    """[summary]
+
+    Args:
+        subdir (str): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    log_dir = Path(".") / "logs" / subdir / datetime.now().strftime("%Y%m%d-%H%M%S")
+    # create it if it isn't there
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(logging.DEBUG)
+
+    logFormatter = logging.Formatter(
+        "%(asctime)s %(message)s", datefmt="%Y-%m-%d %I:%M:%S %p"
+    )
+
+    fileHandler = logging.FileHandler(log_dir / "output.log")
+    fileHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(fileHandler)
+
+    consoleHandler = logging.StreamHandler(stream=sys.stdout)
+    consoleHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleHandler)
+
+    logging.info(f"Logging to directory: {log_dir}")
+
+    return log_dir
+
+
+def normalize_tuple(value: Union[int, tuple], n: int, name):
     """Transforms an integer or iterable of integers into an integer tuple.
 
     A copy of tensorflow.python.keras.util.
