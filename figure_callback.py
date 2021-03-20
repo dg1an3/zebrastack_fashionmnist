@@ -78,8 +78,8 @@ class FigureCallback(Callback):
         figure.suptitle(f"Epoch {epoch}: loss={loss:0.2f}")
 
         # make the save path, if needed
-        self.path.mkdir(parents=True, exist_ok=False)
+        self.path.mkdir(parents=True, exist_ok=True)
 
         # save and close
         figure.savefig(self.path / f"{epoch}-figure.png")
-        figure.close()
+        plt.close(figure)
