@@ -156,13 +156,13 @@ def create_encoder_v2(
             ####
             #### V1 layers
             OrientedPowerMap2D(
-                directions=3, freqs=[2.0, 1.0], size=5, name="v1_powmap"
+                directions=7, freqs=[2.0, 1.0, 0.5, 0.25], size=9, name="v1_powmap"
             ),
             MaxPooling2D(name="v1_pool"),
             # Conv2D(
             #     3, (1, 1), activation=act_func
             # ),  # we want 3 channels after the reduction
-            SpatialDropout2D(0.1, name="v1_dropout"),
+            # SpatialDropout2D(0.1, name="v1_dropout"),
             ####
             #### V2 layers
             Conv2D(16, (3, 3), name="v2_conv2d", activation=act_func, padding="same"),
@@ -180,7 +180,7 @@ def create_encoder_v2(
                 (3, 3),
                 name="ait_local",
                 activation=act_func,
-                kernel_regularizer=l1_l2(l1=0.5, l2=0.5),
+                kernel_regularizer=l1_l2(l1=0.05, l2=0.05),
             ),
             ####
             #### Pulvinar
@@ -510,7 +510,7 @@ if __name__ == "__main__":
     )
 
     # now save the model to the log location
-    log_dir.mkdir(parents=True, exist_ok=False)
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     encoder_fn = log_dir / "encoder_summary.txt"
     with open(encoder_fn, "wt") as f:
