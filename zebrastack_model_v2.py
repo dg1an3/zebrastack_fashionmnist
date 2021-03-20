@@ -156,7 +156,10 @@ def create_encoder_v2(
             ####
             #### V1 layers
             OrientedPowerMap2D(
-                directions=7, freqs=[2.0, 1.0, 0.5, 0.25], size=9, name="v1_powmap"
+                directions=7,
+                freqs=[2.0, 1.0, 0.5, 0.25],
+                size=9,
+                name="v1_powmap",
             ),
             MaxPooling2D(name="v1_pool"),
             # Conv2D(
@@ -471,20 +474,41 @@ if __name__ == "__main__":
     import sys
     import matplotlib.pyplot as plt
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        stream=sys.stdout,
-        format="%(asctime)s %(message)s",
-        datefmt="%Y-%m-%d %I:%M:%S %p",
-    )
-    logging.info(f"tensorflow version = {tf.version.VERSION}")
-
     # create it if it isn't there
     log_dir = Path(".") / "logs" / "figures" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir.mkdir(parents=True, exist_ok=True)
     logging.info(f"Logging to directory: {log_dir}")
+
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(logging.DEBUG)
+
+    logFormatter = logging.Formatter(
+        "%(asctime)s %(message)s", datefmt="%Y-%m-%d %I:%M:%S %p"
+    )
+
+    fileHandler = logging.FileHandler(log_dir / "output.log")
+    fileHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(fileHandler)
+
+    consoleHandler = logging.StreamHandler(stream=sys.stdout)
+    consoleHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleHandler)
+
+    logging.info(f"tensorflow version = {tf.version.VERSION}")
 
     # create the model and write it out
     model = ZebraStackModel(latent_dim=8, use_v2=True)
+
+    # write model summaries to the log location
+    encoder_fn = log_dir / "encoder_summary.txt"
+    with open(encoder_fn, "wt") as f:
+        model.encoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
+    logging.info(f"Write encoder summary to {encoder_fn}")
+
+    decoder_fn = log_dir / "decoder_summary.txt"
+    with open(decoder_fn, "wt") as f:
+        model.decoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
+    logging.info(f"Write decoder summary to {decoder_fn}")
 
     # load the fashion mnist dataset
     (_train_images, _), (
@@ -506,19 +530,12 @@ if __name__ == "__main__":
     # now do training
     nb_callback = FigureCallback(log_dir)
     model.train(
-        _train_images, _test_images, batch_size=16, epoch_count=25, callback=nb_callback
+        _train_images,
+        _test_images,
+        batch_size=16,
+        epoch_count=100,
+        callback=nb_callback,
     )
 
     # now save the model to the log location
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    encoder_fn = log_dir / "encoder_summary.txt"
-    with open(encoder_fn, "wt") as f:
-        model.encoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
-    logging.info(f"Write encoder summary to {encoder_fn}")
-
-    decoder_fn = log_dir / "decoder_summary.txt"
-    with open(decoder_fn, "wt") as f:
-        model.decoder.summary(print_fn=lambda ln: f.write(f"{ln}\n"))
-    logging.info(f"Write decoder summary to {decoder_fn}")
     model.save_model(log_dir)

@@ -68,18 +68,24 @@ def make_meshgrid(size=9):
     )
 
 
-def make_gabor_kernels(x_grid, y_grid, directions=3, freqs=[2.0, 1.0]) -> tf.Tensor:
+def make_gabor_kernels(
+    x_grid, y_grid, in_channels=1, directions=3, freqs=[2.0, 1.0]
+) -> tf.Tensor:
     """makes a bank of gabor kernels as a complex tensor
 
     Args:
         x_grid ([type]): [description]
         y_grid ([type]): [description]
+        in_channels (int):
         directions (int, optional): [description]. Defaults to 3.
         freqs (list, optional): [description]. Defaults to [2.0, 1.0].
 
     Returns:
         tf.Tensor: complex tensor with a kernel on each channel
     """
+    if in_channels != 1:
+        raise ValueError("Only support single-channel gabor kernels")
+
     angles_rad = [n * np.pi / float(directions) for n in range(directions)]
     sine_kernels = kernels2tensor(
         [
@@ -121,10 +127,15 @@ class OrientedPowerMap2D(Layer):
         Args:
             input_shape ([type]): [description]
         """
+
         # computer gabor filter bank
         x_grid, y_grid = make_meshgrid(size=self.size)
         kernels = make_gabor_kernels(
-            x_grid, y_grid, directions=self.directions, freqs=self.freqs
+            x_grid,
+            y_grid,
+            in_channels=input_shape[-1],
+            directions=self.directions,
+            freqs=self.freqs,
         )
         self._real_kernels = tf.math.real(kernels)
         self._imag_kernels = tf.math.imag(kernels)
