@@ -6,20 +6,6 @@ import tensorflow as tf
 from tensorflow.keras.layers import Layer
 
 
-def kernels2tensor(kernels: List[np.ndarray], dtype=tf.float32) -> tf.Tensor:
-    """turns list of numpy arrays to a tensor of given typeS
-
-    Args:
-        kernels (List[np.ndarray]): input kernels
-        dtype ([type], optional): resulting tensor dtype. Defaults to tf.float32.
-
-    Returns:
-        tf.Tensor: the tensor formed from the kernels.  axis for kernels is last
-    """
-    kernels = np.moveaxis(np.expand_dims(kernels, axis=-1), 0, -1)
-    return tf.constant(kernels, dtype=dtype)
-
-
 def complex_exp(x_grid, y_grid, freq, angle_rad):
     """[summary]
 
@@ -68,8 +54,22 @@ def make_meshgrid(size=9):
     )
 
 
+def kernels2tensor(
+    kernels: List[np.ndarray], channels: int, dtype=tf.float32
+) -> tf.Tensor:
+    """turns list of numpy arrays to a tensor of given typeS
+
+    Returns:
+        tf.Tensor: the tensor formed from the kernels.  axis for kernels is last
+    """
+
+    kernels = np.stack([kernels] * channels, axis=-1)
+    kernels = np.moveaxis(kernels, 0, -1)
+    return tf.constant(kernels, dtype=dtype)
+
+
 def make_gabor_kernels(
-    x_grid, y_grid, in_channels=1, directions=3, freqs=[2.0, 1.0]
+    x_grid, y_grid, in_channels, directions=3, freqs=[2.0, 1.0]
 ) -> tf.Tensor:
     """makes a bank of gabor kernels as a complex tensor
 
@@ -83,8 +83,6 @@ def make_gabor_kernels(
     Returns:
         tf.Tensor: complex tensor with a kernel on each channel
     """
-    if in_channels != 1:
-        raise ValueError("Only support single-channel gabor kernels")
 
     angles_rad = [n * np.pi / float(directions) for n in range(directions)]
     sine_kernels = kernels2tensor(
@@ -92,16 +90,19 @@ def make_gabor_kernels(
             complex_exp(x_grid, y_grid, freq, angle_rad)
             for freq in freqs
             for angle_rad in angles_rad
-        ]
+        ],
+        channels=in_channels,
     )
     sigmas = [2.0 / freq for freq in freqs]
-    gauss_kernels = kernels2tensor([gauss(x_grid, y_grid, sigma) for sigma in sigmas])
+    gauss_kernels = kernels2tensor(
+        [gauss(x_grid, y_grid, sigma) for sigma in sigmas], channels=in_channels
+    )
     gauss_kernels = np.repeat(
         gauss_kernels, sine_kernels.shape[-1] // gauss_kernels.shape[-1], axis=-1
     )
 
     bank = gauss_kernels * sine_kernels
-    g0 = kernels2tensor([gauss(x_grid, y_grid, 4.0 / freqs[-1])])
+    g0 = kernels2tensor([gauss(x_grid, y_grid, 4.0 / freqs[-1])], channels=in_channels)
     return tf.concat([bank, g0], -1)
 
 
@@ -163,7 +164,7 @@ if __name__ == "__main__":
     for_freq = [2.0, 1.0]
     _x_grid, _y_grid = make_meshgrid(size=9)
     gabor_kernels = make_gabor_kernels(
-        _x_grid, _y_grid, directions=for_dir, freqs=for_freq
+        _x_grid, _y_grid, 6, directions=for_dir, freqs=for_freq
     )
 
     _, axs = plt.subplots(
