@@ -9,13 +9,13 @@ import numpy as np
 
 
 def configure_logger(subdir: str):
-    """[summary]
+    """set up the logger to log to the given subdir (from current)
 
     Args:
-        subdir (str): [description]
+        subdir (str): subdir name to log under
 
     Returns:
-        [type]: [description]
+        Path: log_dir that can be used for other logging
     """
     log_dir = Path(".") / "logs" / subdir / datetime.now().strftime("%Y%m%d-%H%M%S")
     # create it if it isn't there
@@ -108,14 +108,14 @@ def normalize_tuple(value: Union[int, tuple], n: int, name):
         return value_tuple
 
 
-def normalize_data_format(value):
-    """[summary]
+def normalize_data_format(value: str) -> str:
+    """checks value for data format
 
     Args:
-        value ([type]): [description]
+        value (str): input value to check
 
     Returns:
-        [type]: [description]
+        str: normalized value (lowercase)
     """
     data_format = value.lower()
     assert data_format in {"channels_first", "channels_last"}
@@ -196,11 +196,11 @@ def generate_batches(
     """Batches and trains using a given function
 
     Args:
-        input_data (np.ndarray): [description]
-        batch_size (int): [description]
+        input_data (np.ndarray): input tensor
+        batch_size (int): size of each batch
 
     Yields:
-        Generator[np.ndarray, None, None]: [description]
+        Generator[np.ndarray, None, None]: generator of batches
     """
 
     step = 0

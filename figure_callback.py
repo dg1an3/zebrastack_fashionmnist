@@ -1,3 +1,4 @@
+from typing import List
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -6,30 +7,22 @@ from tensorflow.keras.layers import Layer
 
 
 class FigureCallback(Callback):
-    """[summary]
+    """callback that generates plt figures and saves in the logdir
 
     Args:
-        path ([type]): [description]
+        path (Path): log directory to save figures under
     """
 
-    def __init__(self, path):
+    def __init__(self, layer_names: List[str], path):
+        self.layer_names = layer_names
         self.path = path
 
-    def on_train_batch_end(self, batch: int, logs: dict = None):
-        """[summary]
+    def on_epoch_end(self, epoch: int, logs: dict):
+        """at the end of each epoch, create and write the figure
 
         Args:
-            batch (int): [description]
-            logs ([type], optional): [description]. Defaults to None.
-        """
-        pass
-
-    def on_epoch_end(self, epoch: int, logs: dict = None):
-        """[summary]
-
-        Args:
-            epoch (int): [description]
-            logs (dict, optional): [description]. Defaults to None.
+            epoch (int): epoch number
+            logs (dict): log dict with loss, original, and reconstructed batches.
         """
         loss = logs["loss"]
         original = logs["original"]
@@ -39,18 +32,10 @@ class FigureCallback(Callback):
         figure, axes = plt.subplots(3, col_count, figsize=(15, 5))
 
         # these are the layers to show histograms
-        layer_names = [
-            # "v1_conv2d",
-            # "v2_conv2d",
-            # "v4_conv2d",
-            "pit_conv2d",
-            "cit_conv2d",
-            "ait_local",
-        ]
-        for bins_col in range(len(layer_names)):
+        for bins_col in range(len(self.layer_names)):
 
             # get the layer
-            layer = self.model.get_layer(layer_names[bins_col])
+            layer = self.model.get_layer(self.layer_names[bins_col])
 
             # set the title for the plot
             axes[0][bins_col].set_title(layer.name)

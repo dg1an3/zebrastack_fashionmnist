@@ -1,10 +1,4 @@
 """zebrastack_model_v2
-
-Returns:
-    [type]: [description]
-
-Yields:
-    [type]: [description]
 """
 from datetime import datetime
 import logging
@@ -387,11 +381,14 @@ class ZebraStackModel:
         epoch_count: int = 10,
         callback: Optional[tf.keras.callbacks.Callback] = None,
     ):
-        """[summary]
+        """perform training on train images; update with result of test images
 
         Args:
-            train_images (tf.Tensor): [description]
-            test_images (tf.Tensor): [description]
+            train_images (tf.Tensor): train images in the form of a tensor
+            test_images (tf.Tensor): test images
+            batch_size (int, optional): batch size for training. Defaults to 16.
+            epoch_count (int, optional): number of epochs. Defaults to 10.
+            callback (Optional[tf.keras.callbacks.Callback], optional): training callback. Defaults to None.
         """
 
         # this will carry intermediate results to the callback
@@ -514,8 +511,11 @@ if __name__ == "__main__":
     _test_images = prepare_images(_test_images)
     logging.info(f"train_images: {_train_images.shape} {_train_images.dtype}")
 
+    # set up figure callback for V2 layers
+    layer_names = ["v2_reduce", "v4_reduce", "pit_conv2d", "cit_conv2d", "ait_local"]
+    nb_callback = FigureCallback(layer_names, log_dir)
+
     # now do training
-    nb_callback = FigureCallback(log_dir)
     model.train(
         _train_images,
         _test_images,
