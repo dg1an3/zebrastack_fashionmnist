@@ -63,7 +63,10 @@ def kernels2tensor(
         tf.Tensor: the tensor formed from the kernels.  axis for kernels is last
     """
 
-    kernels = np.stack([kernels] * channels, axis=-1)
+    kernels = np.array(kernels)
+    kernels = np.expand_dims(kernels, axis=-1)
+    kernels = np.repeat(kernels, channels, axis=0)
+    kernels = np.repeat(kernels, channels, axis=-1)
     kernels = np.moveaxis(kernels, 0, -1)
     return tf.constant(kernels, dtype=dtype)
 

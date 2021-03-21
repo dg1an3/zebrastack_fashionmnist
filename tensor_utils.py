@@ -36,6 +36,10 @@ def configure_logger(subdir: str):
     consoleHandler.setFormatter(logFormatter)
     rootLogger.addHandler(consoleHandler)
 
+    # disable plt debug logging
+    plt_logger = logging.getLogger("matplotlib")
+    plt_logger.setLevel(logging.WARNING)
+
     logging.info(f"Logging to directory: {log_dir}")
 
     return log_dir

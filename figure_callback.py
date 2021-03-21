@@ -41,7 +41,7 @@ class FigureCallback(Callback):
         # these are the layers to show histograms
         layer_names = [
             # "v1_conv2d",
-            "v2_conv2d",
+            # "v2_conv2d",
             "v4_conv2d",
             "pit_conv2d",
             "cit_conv2d",
