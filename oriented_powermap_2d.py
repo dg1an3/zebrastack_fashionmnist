@@ -1,52 +1,54 @@
-"""implements the GaborPowerMap2D keras layer
+"""implements the OrientedPowerMap2D keras layer
 """
-from typing import List
+from typing import List, Tuple
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Layer
 
 
-def complex_exp(x_grid, y_grid, freq, angle_rad):
-    """[summary]
+def complex_exp(
+    x_grid: np.ndarray, y_grid: np.ndarray, freq: float, angle_rad: float
+) -> np.ndarray:
+    """compute complex exponential on the grid for given frequency and angle
 
     Args:
-        x_grid ([type]): [description]
-        y_grid ([type]): [description]
-        freq ([type]): [description]
-        angle_rad ([type]): [description]
+        x_grid (np.ndarray): the x coordinates on the grid
+        y_grid (np.ndarray): the y coordinates on the grid
+        freq (float): frequency of the exponential
+        angle_rad (float): direction of the exponential, in radians
 
     Returns:
-        [type]: [description]
+        np.ndarray: complex exponential at the grid points
     """
     return np.exp(
         freq * (x_grid * np.sin(angle_rad) + y_grid * np.cos(angle_rad)) * 1.0j
     )
 
 
-def gauss(x_grid, y_grid, sigma):
-    """[summary]
+def gauss(x_grid: np.ndarray, y_grid: np.ndarray, sigma: float) -> np.ndarray:
+    """computed the gaussian on the given grid
 
     Args:
-        xs ([type]): [description]
-        ys ([type]): [description]
-        sigma ([type]): [description]
+        x_grid (np.ndarray): the x coordinates on the grid
+        y_grid (np.ndarray): the y coordinates on the grid
+        sigma (float): gaussian sigma
 
     Returns:
-        [type]: [description]
+        np.ndarray: gaussian at the grid points
     """
     return (1 / (2 * np.pi * sigma ** 2)) * np.exp(
         -(x_grid * x_grid + y_grid * y_grid) / (2.0 * sigma * sigma)
     )
 
 
-def make_meshgrid(size=9):
-    """[summary]
+def make_meshgrid(size: int = 9) -> Tuple[np.ndarray, np.ndarray]:
+    """makes a mesh centered at 0,0 of the given size
 
     Args:
-        sz (int, optional): [description]. Defaults to 9.
+        size (int, optional): size of the grid. Defaults to 9.
 
     Returns:
-        [type]: [description]
+        tuple[np.ndarray, np.ndarray]: tuple of x- and y- grids
     """
     return np.meshgrid(
         np.linspace(-(size // 2), size // 2, size),
@@ -58,6 +60,11 @@ def kernels2tensor(
     kernels: List[np.ndarray], channels: int, dtype=tf.float32
 ) -> tf.Tensor:
     """turns list of numpy arrays to a tensor of given typeS
+
+    Args:
+        kernels (List[np.ndarray]): list of kernels to be turned to tensor
+        channels (int): input channels, supported by repeating
+        dtype ([type], optional): type of output tensor. Defaults to tf.float32.
 
     Returns:
         tf.Tensor: the tensor formed from the kernels.  axis for kernels is last
