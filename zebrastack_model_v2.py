@@ -156,8 +156,8 @@ def create_encoder_v2(
             ####
             #### V1 layers
             OrientedPowerMap2D(
-                directions=5,
-                freqs=[1.0, 0.5, 0.25],
+                directions=7,
+                freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v1_powmap",
             ),
@@ -169,22 +169,28 @@ def create_encoder_v2(
             ####
             #### V2 layers
             OrientedPowerMap2D(
-                directions=5,
-                freqs=[1.0, 0.5, 0.25],
+                directions=7,
+                freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v2_powmap",
             ),
             # dimensional reduction
-            # Conv2D(16, (1, 1), name="v2_reduce", activation=act_func, padding="same"),
+            Conv2D(16, (1, 1), name="v2_reduce", activation=act_func, padding="same"),
             MaxPooling2D((2, 2), name="v2_maxpool", padding="same"),
             ####
             #### V4 layers
-            Conv2D(32, (3, 3), name="v4_conv2d", activation=act_func, padding="same"),
+            OrientedPowerMap2D(
+                directions=7,
+                freqs=[2.0, 1.0, 0.5, 0.25],
+                size=9,
+                name="v4_powmap",
+            ),
+            Conv2D(32, (1, 1), name="v4_reduce", activation=act_func, padding="same"),
             MaxPooling2D((2, 2), name="v4_maxpool", padding="same"),
             ####
             #### IT Layers
             Conv2D(32, (3, 3), name="pit_conv2d", activation=act_func, padding="same"),
-            Conv2D(64, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
+            Conv2D(8, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
             LocallyConnected2D(
                 locally_connected_channels,
                 (3, 3),
@@ -243,7 +249,7 @@ def create_decoder(
             ),
             ZeroPadding2D(padding=(1, 1), name="cit_padding_back"),
             Conv2DTranspose(
-                64, (3, 3), name="cit_conv2d_trans", activation=act_func, padding="same"
+                8, (3, 3), name="cit_conv2d_trans", activation=act_func, padding="same"
             ),
             Conv2DTranspose(
                 32, (3, 3), name="pit_conv2d_trans", activation=act_func, padding="same"
