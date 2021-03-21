@@ -33,7 +33,7 @@ from tensorflow.keras.layers import (
 from tensorflow.keras.regularizers import l1_l2
 from tensorflow.keras.models import Sequential
 
-from gabor_powermap_2d import OrientedPowerMap2D
+from oriented_powermap_2d import OrientedPowerMap2D
 from logsumexp_pooling_2d import LogSumExpPooling2D
 from figure_callback import FigureCallback
 from tensor_utils import configure_logger, generate_batches
@@ -156,20 +156,16 @@ def create_encoder_v2(
             ####
             #### V1 layers
             OrientedPowerMap2D(
-                directions=7,
+                directions=5,
                 freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v1_powmap",
             ),
             MaxPooling2D((2, 2), name="v1_maxpool", padding="same"),
-            # Conv2D(
-            #     3, (1, 1), activation=act_func
-            # ),  # we want 3 channels after the reduction
-            # SpatialDropout2D(0.1, name="v1_dropout"),
             ####
             #### V2 layers
             OrientedPowerMap2D(
-                directions=7,
+                directions=5,
                 freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v2_powmap",
@@ -180,7 +176,7 @@ def create_encoder_v2(
             ####
             #### V4 layers
             OrientedPowerMap2D(
-                directions=7,
+                directions=5,
                 freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v4_powmap",
