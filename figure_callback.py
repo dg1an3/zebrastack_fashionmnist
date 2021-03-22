@@ -4,12 +4,40 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.layers import Layer
+from skimage.transform import rescale
+from itk import (
+    image_from_array,
+    array_from_image,
+    gradient_anisotropic_diffusion_image_filter,
+)
+
+
+def filter_regenerated(im: np.ndarray):
+    """[summary]
+
+    Args:
+        im (tf.Tensor): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    im = rescale(im, 2.0, order=3)
+    im = image_from_array(im)
+    filtered_im = gradient_anisotropic_diffusion_image_filter(
+        im,
+        number_of_iterations=400,
+        time_step=0.12,
+        conductance_parameter=1.0,
+        conductance_scaling_update_interval=10,
+    )
+    return array_from_image(filtered_im)
 
 
 class FigureCallback(Callback):
     """callback that generates plt figures and saves in the logdir
 
     Args:
+        layer_names (str): sub_dir to put the figures in
         path (Path): log directory to save figures under
     """
 
@@ -55,9 +83,10 @@ class FigureCallback(Callback):
             axes[1][n].imshow(original[n], cmap="gray", vmin=q_test[0], vmax=q_test[1])
 
             reshape_test_image = np.reshape(reconstructed[n], (64, 64))
-            q_re = np.quantile(reshape_test_image, quantiles)
+            filtered_test_image = filter_regenerated(reshape_test_image)
+            q_re = np.quantile(filtered_test_image, quantiles)
             axes[2][n].imshow(
-                reshape_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
+                filtered_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
             )
 
         figure.suptitle(f"Epoch {epoch}: loss={loss:0.2f}")

@@ -8,7 +8,7 @@ from typing import Callable, Generator, Optional
 
 from autologging import logged
 import numpy as np
-from skimage.transform import resize
+from skimage.transform import resize, rescale
 import tensorflow as tf
 from tensorflow.keras.layers import (
     Input,
@@ -47,7 +47,10 @@ def prepare_images(img_array: np.ndarray, size=64):
     assert len(img_array.shape) == 3
     img_array = (img_array / 255.0).astype(np.float32)
     # prepare_images._log.info(f"img_array: {img_array.shape} {img_array.dtype}")
-    img_array = [resize(img_array[n], (size, size)) for n in range(img_array.shape[0])]
+    img_array = [
+        rescale(img_array[n], size / img_array.shape[-1], order=3)
+        for n in range(img_array.shape[0])
+    ]
     img_array = np.reshape(img_array, (len(img_array), size, size, 1))
     # prepare_images._log.info(f"img_array: {img_array.shape} {img_array.dtype}")
     return img_array
@@ -520,7 +523,7 @@ if __name__ == "__main__":
         _train_images,
         _test_images,
         batch_size=16,
-        epoch_count=100,
+        epoch_count=10,
         callback=nb_callback,
     )
 
