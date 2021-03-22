@@ -178,11 +178,11 @@ def create_encoder_v2(
                 size=9,
                 name="v4_powmap",
             ),
-            Conv2D(32, (1, 1), name="v4_reduce", activation=act_func, padding="same"),
+            Conv2D(16, (1, 1), name="v4_reduce", activation=act_func, padding="same"),
             MaxPooling2D((2, 2), name="v4_maxpool", padding="same"),
             ####
             #### IT Layers
-            Conv2D(32, (3, 3), name="pit_conv2d", activation=act_func, padding="same"),
+            Conv2D(16, (3, 3), name="pit_conv2d", activation=act_func, padding="same"),
             Conv2D(8, (3, 3), name="cit_conv2d", activation=act_func, padding="same"),
             LocallyConnected2D(
                 locally_connected_channels,
@@ -245,12 +245,12 @@ def create_decoder(
                 8, (3, 3), name="cit_conv2d_trans", activation=act_func, padding="same"
             ),
             Conv2DTranspose(
-                32, (3, 3), name="pit_conv2d_trans", activation=act_func, padding="same"
+                16, (3, 3), name="pit_conv2d_trans", activation=act_func, padding="same"
             ),
             ####
             #### V4 retro layers
             Conv2DTranspose(
-                32, (3, 3), name="v4_conv2d_trans", activation=act_func, padding="same"
+                16, (3, 3), name="v4_conv2d_trans", activation=act_func, padding="same"
             ),
             UpSampling2D((2, 2), name="v4_upsample_back"),
             ####
