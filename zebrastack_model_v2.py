@@ -523,7 +523,7 @@ if __name__ == "__main__":
         _train_images,
         _test_images,
         batch_size=16,
-        epoch_count=10,
+        epoch_count=50,
         callback=nb_callback,
     )
 

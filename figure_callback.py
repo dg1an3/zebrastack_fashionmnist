@@ -25,7 +25,7 @@ def filter_regenerated(im: np.ndarray):
     im = image_from_array(im)
     filtered_im = gradient_anisotropic_diffusion_image_filter(
         im,
-        number_of_iterations=400,
+        number_of_iterations=100,
         time_step=0.12,
         conductance_parameter=1.0,
         conductance_scaling_update_interval=10,
