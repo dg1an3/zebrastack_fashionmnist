@@ -4,12 +4,13 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.layers import Layer
-from skimage.transform import rescale
+from skimage.transform import rescale, resize
 from itk import (
     image_from_array,
     array_from_image,
     gradient_anisotropic_diffusion_image_filter,
 )
+from anisotropic_diffusion import anisotropic_diffusion_
 
 
 def filter_regenerated(im: np.ndarray):
@@ -44,6 +45,7 @@ class FigureCallback(Callback):
     def __init__(self, layer_names: List[str], path):
         self.layer_names = layer_names
         self.path = path
+        self.filter_test_image = False
 
     def on_epoch_end(self, epoch: int, logs: dict):
         """at the end of each epoch, create and write the figure
@@ -83,11 +85,24 @@ class FigureCallback(Callback):
             axes[1][n].imshow(original[n], cmap="gray", vmin=q_test[0], vmax=q_test[1])
 
             reshape_test_image = np.reshape(reconstructed[n], (64, 64))
-            filtered_test_image = filter_regenerated(reshape_test_image)
-            q_re = np.quantile(filtered_test_image, quantiles)
-            axes[2][n].imshow(
-                filtered_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
+            reshape_test_image = resize(
+                reshape_test_image, (256, 256), order=3, anti_aliasing=True
             )
+
+            q_re = np.quantile(reshape_test_image, quantiles)
+
+            if self.filter_image:
+                reshape_test_image -= q_re[0]
+                reshape_test_image /= q_re[1] - q_re[0]
+
+                filtered_test_image = anisotropic_diffusion_(
+                    reshape_test_image, niter=20, kappa=0.1, option=3, gradient_scale=8
+                )
+                axes[2][n].imshow(filtered_test_image, cmap="gray", vmin=0.0, vmax=1.0)
+            else:
+                axes[2][n].imshow(
+                    filtered_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
+                )
 
         figure.suptitle(f"Epoch {epoch}: loss={loss:0.2f}")
 

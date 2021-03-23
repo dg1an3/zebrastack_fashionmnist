@@ -123,7 +123,7 @@ def create_encoder_v1(
 def create_encoder_v2(
     size=64,
     latent_dim=8,
-    locally_connected_channels=2,
+    locally_connected_channels=3,
     act_func="softplus",
 ):
     """creates the encoder side of the autoencoder, mapping to latent_dim gaussian
@@ -153,7 +153,7 @@ def create_encoder_v2(
             ####
             #### V1 layers
             OrientedPowerMap2D(
-                directions=5,
+                directions=7,
                 freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v1_powmap",
@@ -162,7 +162,7 @@ def create_encoder_v2(
             ####
             #### V2 layers
             OrientedPowerMap2D(
-                directions=5,
+                directions=7,
                 freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v2_powmap",
@@ -173,7 +173,7 @@ def create_encoder_v2(
             ####
             #### V4 layers
             OrientedPowerMap2D(
-                directions=5,
+                directions=7,
                 freqs=[2.0, 1.0, 0.5, 0.25],
                 size=9,
                 name="v4_powmap",
@@ -203,7 +203,7 @@ def create_encoder_v2(
 
 
 def create_decoder(
-    dense_shape, latent_dim=8, locally_connected_channels=2, act_func="softplus"
+    dense_shape, latent_dim=8, locally_connected_channels=3, act_func="softplus"
 ):
     """creates the decoder side of the autoencoder, given the input shape
     Args:
