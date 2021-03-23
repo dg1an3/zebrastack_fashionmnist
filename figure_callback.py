@@ -91,7 +91,7 @@ class FigureCallback(Callback):
 
             q_re = np.quantile(reshape_test_image, quantiles)
 
-            if self.filter_image:
+            if self.filter_test_image:
                 reshape_test_image -= q_re[0]
                 reshape_test_image /= q_re[1] - q_re[0]
 
@@ -101,7 +101,7 @@ class FigureCallback(Callback):
                 axes[2][n].imshow(filtered_test_image, cmap="gray", vmin=0.0, vmax=1.0)
             else:
                 axes[2][n].imshow(
-                    filtered_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
+                    reshape_test_image, cmap="gray", vmin=q_re[0], vmax=q_re[1]
                 )
 
         figure.suptitle(f"Epoch {epoch}: loss={loss:0.2f}")
