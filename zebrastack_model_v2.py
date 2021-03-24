@@ -1,14 +1,13 @@
 """zebrastack_model_v2
 """
-from datetime import datetime
 import logging
 from time import time
 from pathlib import Path
-from typing import Callable, Generator, Optional
+from typing import Optional
 
 from autologging import logged
 import numpy as np
-from skimage.transform import resize, rescale
+from skimage.transform import rescale
 import tensorflow as tf
 from tensorflow.keras.layers import (
     Input,
@@ -21,7 +20,6 @@ from tensorflow.keras.layers import (
     LocallyConnected2D,
     Dense,
     Flatten,
-    ActivityRegularization,
     Reshape,
 )
 from tensorflow.keras.regularizers import l1_l2
@@ -387,11 +385,16 @@ class ZebraStackModel:
         """perform training on train images; update with result of test images
 
         Args:
-            train_images (tf.Tensor): train images in the form of a tensor
-            test_images (tf.Tensor): test images
-            batch_size (int, optional): batch size for training. Defaults to 16.
-            epoch_count (int, optional): number of epochs. Defaults to 10.
-            callback (Optional[tf.keras.callbacks.Callback], optional): training callback. Defaults to None.
+            train_images (tf.Tensor):
+                train images in the form of a tensor
+            test_images (tf.Tensor):
+                test images
+            batch_size (int, optional):
+                batch size for training. Defaults to 16.
+            epoch_count (int, optional):
+                number of epochs. Defaults to 10.
+            callback (Optional[tf.keras.callbacks.Callback], optional):
+                training callback. Defaults to None.
         """
 
         # this will carry intermediate results to the callback
@@ -485,13 +488,45 @@ class ZebraStackModel:
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Train or run inference using zebrastack model."
+    )
+    parser.add_argument(
+        "--encoder-ver",
+        metavar="encoder version",
+        type=int,
+        default=2,
+        help="version of the encoder: 1 or 2",
+    )
+    parser.add_argument(
+        "--latent_dim",
+        metavar="latent dimension",
+        type=int,
+        default=8,
+        help="latent dimension for the autoencoder",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=25,
+        help="the number of epochs to train",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=16,
+        help="batch size for training",
+    )
+
+    args = parser.parse_args()
 
     log_dir = configure_logger("figures")
     logging.info(f"tensorflow version = {tf.version.VERSION}")
 
     # create the model and write it out
-    model = ZebraStackModel(latent_dim=8, use_v2=True)
+    model = ZebraStackModel(latent_dim=args.latent_dim, use_v2=(args.encoder_ver == 2))
 
     # write model summaries to the log location
     model.encoder.summary(print_fn=logging.info)
@@ -515,15 +550,24 @@ if __name__ == "__main__":
     logging.info(f"train_images: {_train_images.shape} {_train_images.dtype}")
 
     # set up figure callback for V2 layers
-    layer_names = ["v2_reduce", "v4_reduce", "pit_conv2d", "cit_conv2d", "ait_local"]
+    if args.encoder_ver == 2:
+        layer_names = [
+            "v2_reduce",
+            "v4_reduce",
+            "pit_conv2d",
+            "cit_conv2d",
+            "ait_local",
+        ]
+    else:
+        layer_names = ["pit_conv2d", "cit_conv2d", "ait_local"]
     nb_callback = FigureCallback(layer_names, log_dir)
 
     # now do training
     model.train(
         _train_images,
         _test_images,
-        batch_size=16,
-        epoch_count=50,
+        batch_size=args.batch_size,
+        epoch_count=args.epochs,
         callback=nb_callback,
     )
 
