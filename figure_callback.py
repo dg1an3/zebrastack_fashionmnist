@@ -5,33 +5,7 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.layers import Layer
 from skimage.transform import rescale, resize
-from itk import (
-    image_from_array,
-    array_from_image,
-    gradient_anisotropic_diffusion_image_filter,
-)
 from anisotropic_diffusion import anisotropic_diffusion_
-
-
-def filter_regenerated(im: np.ndarray):
-    """[summary]
-
-    Args:
-        im (tf.Tensor): [description]
-
-    Returns:
-        [type]: [description]
-    """
-    im = rescale(im, 2.0, order=3)
-    im = image_from_array(im)
-    filtered_im = gradient_anisotropic_diffusion_image_filter(
-        im,
-        number_of_iterations=20,
-        time_step=0.12,
-        conductance_parameter=1.0,
-        conductance_scaling_update_interval=10,
-    )
-    return array_from_image(filtered_im)
 
 
 class FigureCallback(Callback):
