@@ -165,9 +165,9 @@ def create_encoder_v2(
                 size=9,
                 name="v2_powmap",
             ),
+            MaxPooling2D((2, 2), name="v2_maxpool", padding="same"),
             # dimensional reduction
             Conv2D(16, (1, 1), name="v2_reduce", activation=act_func, padding="same"),
-            MaxPooling2D((2, 2), name="v2_maxpool", padding="same"),
             ####
             #### V4 layers
             OrientedPowerMap2D(
@@ -176,8 +176,8 @@ def create_encoder_v2(
                 size=9,
                 name="v4_powmap",
             ),
-            Conv2D(16, (1, 1), name="v4_reduce", activation=act_func, padding="same"),
             MaxPooling2D((2, 2), name="v4_maxpool", padding="same"),
+            Conv2D(16, (1, 1), name="v4_reduce", activation=act_func, padding="same"),
             ####
             #### IT Layers
             Conv2D(16, (3, 3), name="pit_conv2d", activation=act_func, padding="same"),
@@ -331,10 +331,50 @@ def compute_loss(encoder: Sequential, decoder: Sequential, value: tf.Tensor):
     return -tf.reduce_mean(logpx_z + logpz - logqz_x)
 
 
+# @traced
+def compute_loss_via_channels(
+    encoder: Sequential,
+    decoder: Sequential,
+    encoder_channels_extractor: tf.keras.models.Model,
+    decoder_channels_extractor: tf.keras.models.Model,
+    value: tf.Tensor,
+):
+    """compute the VAE loss function using encoded channels
+
+    Args:
+        encoder ([type]): [description]
+        decoder ([type]): [description]
+        value ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    encoded_value = encoder(value)
+    mean, logvar = tf.split(encoded_value, 2, 1)
+    z_value = reparameterize(mean, logvar)
+    # x_logit = decoder(z_value)
+
+    encoded_channels_value = encoder_channels_extractor(value)
+    encoded_channels_value = tf.sigmoid(encoded_channels_value)
+    decoded_channels_value = decoder_channels_extractor(z_value)
+
+    # tf.print(f"x_logit, x.shape = {x_logit}, {x.shape}")
+    cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+        logits=decoded_channels_value, labels=encoded_channels_value
+    )
+    # tf.print(f"cross_ent.shape = {cross_ent.shape}")
+    logpx_z = -tf.reduce_sum(cross_ent, axis=[1, 2, 3])
+    logpz = log_normal_pdf(z_value, 0.0, 0.0)
+    logqz_x = log_normal_pdf(z_value, mean, logvar)
+    return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+
+
 @tf.function
 def train_step(
     encoder: tf.keras.models.Model,
     decoder: tf.keras.models.Model,
+    encoder_channels_extractor: tf.keras.models.Model,
+    decoder_channels_extractor: tf.keras.models.Model,
     x_samples: tf.Tensor,
     optimizer: tf.optimizers.Optimizer,
 ):
@@ -352,6 +392,17 @@ def train_step(
     all_trainable_variables = encoder.trainable_variables + decoder.trainable_variables
     with tf.GradientTape() as tape:
         loss = compute_loss(encoder, decoder, x_samples)
+
+        # now add loss due to channel matching
+        channel_weight = 0.1
+        loss += channel_weight * compute_loss_via_channels(
+            encoder,
+            decoder,
+            encoder_channels_extractor,
+            decoder_channels_extractor,
+            x_samples,
+        )
+
         # tf.print(f"loss value = {loss}")
     gradients = tape.gradient(loss, all_trainable_variables)
     optimizer.apply_gradients(zip(gradients, all_trainable_variables))
@@ -373,6 +424,14 @@ class ZebraStackModel:
             self.encoder = create_encoder_v1(latent_dim=latent_dim)
         dense_shape = self.encoder.get_layer("ait_local").output_shape
         self.decoder = create_decoder(dense_shape, latent_dim=latent_dim)
+        self.encoder_channels_extractor = tf.keras.Model(
+            inputs=self.encoder.input,
+            outputs=self.encoder.get_layer("v2_maxpool").output,
+        )
+        self.decoder_channels_extractor = tf.keras.Model(
+            inputs=self.decoder.input,
+            outputs=self.decoder.get_layer("v2_conv2d_trans").output,
+        )
 
     def train(
         self,
@@ -417,7 +476,14 @@ class ZebraStackModel:
                 if not step % 10000:
                     logging.info(f"{step}: {input_batch.shape}")
 
-                train_step(self.encoder, self.decoder, input_batch, optimizer)
+                train_step(
+                    self.encoder,
+                    self.decoder,
+                    self.encoder_channels_extractor,
+                    self.decoder_channels_extractor,
+                    input_batch,
+                    optimizer,
+                )
 
             end_time = time()
             time_elapsed = end_time - start_time
@@ -530,13 +596,13 @@ if __name__ == "__main__":
         "--infer",
         type=str,
         default=None,
-        help="run inference on the specified image file"        
+        help="run inference on the specified image file",
     )
     parser.add_argument(
         "--generate",
         type=str,
         default=None,
-        help="generate from string latent variable"
+        help="generate from string latent variable",
     )
 
     args = parser.parse_args()
