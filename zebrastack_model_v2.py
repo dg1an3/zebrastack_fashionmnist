@@ -501,11 +501,18 @@ if __name__ == "__main__":
         help="version of the encoder: 1 or 2",
     )
     parser.add_argument(
-        "--latent_dim",
+        "--latent-dim",
         metavar="latent dimension",
         type=int,
         default=8,
         help="latent dimension for the autoencoder",
+    )
+    parser.add_argument(
+        "--locally-connected",
+        metavar="locally connected channels",
+        type=int,
+        default=2,
+        help="locally connected channels for the autoencoder",
     )
     parser.add_argument(
         "--epochs",
@@ -518,6 +525,18 @@ if __name__ == "__main__":
         type=int,
         default=16,
         help="batch size for training",
+    )
+    parser.add_argument(
+        "--infer",
+        type=str,
+        default=None,
+        help="run inference on the specified image file"        
+    )
+    parser.add_argument(
+        "--generate",
+        type=str,
+        default=None,
+        help="generate from string latent variable"
     )
 
     args = parser.parse_args()
