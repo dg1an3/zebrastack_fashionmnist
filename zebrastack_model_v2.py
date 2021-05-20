@@ -108,13 +108,13 @@ def create_encoder_v1(
                 kernel_regularizer=l1_l2(0.5, 0.5),
             ),
             ####
-            #### Pulvinar
+            #### VLPFC
             # generate latent vector Q(z|X)
-            Flatten(name="pulvinar_flatten"),
-            Dense(latent_dim, name="pulvinar_dense", activation=act_func),
+            Flatten(name="vlpfc_flatten"),
+            Dense(latent_dim, name="vlpfc_dense", activation=act_func),
             Dense(latent_dim + latent_dim, name="z_mean_log_var"),
         ],
-        name="v1_to_pulvinar_encoder",
+        name="v1_to_vlpfc_encoder",
     )
 
 
@@ -190,13 +190,13 @@ def create_encoder_v2(
                 kernel_regularizer=l1_l2(l1=0.05, l2=0.05),
             ),
             ####
-            #### Pulvinar
+            #### VLPFC
             # generate latent vector Q(z|X)
-            Flatten(name="pulvinar_flatten"),
-            Dense(latent_dim, name="pulvinar_dense", activation=act_func),
+            Flatten(name="vlpfc_flatten"),
+            Dense(latent_dim, name="vlpfc_dense", activation=act_func),
             Dense(latent_dim + latent_dim, name="z_mean_log_var"),
         ],
-        name="v1_to_pulvinar_encoder",
+        name="v1_to_vlpfc_encoder",
     )
 
 
@@ -221,12 +221,12 @@ def create_decoder(
             Input(shape=(latent_dim,), name="z_sampling"),
             Dense(
                 dense_shape[1] * dense_shape[2] * dense_shape[3],
-                name="pulvinar_dense_back",
+                name="vlpfc_dense_back",
                 activation=act_func,
             ),
             Reshape(
                 (dense_shape[1], dense_shape[2], dense_shape[3]),
-                name="pulvinar_antiflatten",
+                name="vlpfc_antiflatten",
             ),
             ####
             #### IT retro Layers
@@ -583,7 +583,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--epochs",
         type=int,
-        default=25,
+        default=100,
         help="the number of epochs to train",
     )
     parser.add_argument(
