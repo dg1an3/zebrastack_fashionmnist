@@ -16,6 +16,15 @@ namespace FashionMnistVaeTfNet
 
             var helloWorldTensor = tf.constant(helloWorldArray);
             Console.WriteLine(helloWorldTensor);
+
+            var x = tf.Variable(10, name: "x");
+            Console.Write(x);
+            //using (var session = tf.Session())
+            //{
+            //    // session.run(x.initializer);
+            //    var result = session.run(x);
+                
+            //}
         }
     }
 }
