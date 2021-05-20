@@ -1,5 +1,6 @@
 ﻿using System;
 using static Tensorflow.Binding;
+using NumSharp;
 
 namespace FashionMnistVaeTfNet
 {
@@ -7,8 +8,14 @@ namespace FashionMnistVaeTfNet
     {
         static void Main(string[] args)
         {
-            var hello = tf.constant("Hello, TensorFlow!");
-            Console.WriteLine(hello);
+            var helloWorldArray = np.array(new int[,]
+            {
+                {4,3,7,7,0},
+                {8,0,6,7,0}
+            });
+
+            var helloWorldTensor = tf.constant(helloWorldArray);
+            Console.WriteLine(helloWorldTensor);
         }
     }
 }
