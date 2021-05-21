@@ -68,21 +68,56 @@ namespace FashionMnistVaeTfNet
                           epochs: 10,
                           validation_split: 0.2f);
             }
+        }
 
-            {
-                var sequential = keras.Sequential(
-                    new List<ILayer>() 
-                    {
-                        keras.layers.Conv2D(32, 3, activation: "relu"),
-                        keras.layers.Conv2D(64, 3, activation: "relu"),
-                        keras.layers.MaxPooling2D(3),
-                        keras.layers.Conv2D(64, 3, activation: "relu", padding: "same"),
-                        keras.layers.Conv2D(64, 3, activation: "relu", padding: "same"),
-                        keras.layers.Conv2D(64, 3, activation: "relu", padding: "same"),
-                        keras.layers.Conv2D(64, 3, activation: "relu", padding: "same"),
-                        keras.layers.Conv2D(64,3, activation: "relu", padding: "same"),
-                    }, name: "myModel");
-            }
+        /// <summary>
+        /// creates the encoder side of the autoencoder, mapping to latent_dim gaussian
+        /// </summary>
+        /// <param name="size">input is size x size.Defaults to 64.</param>
+        /// <param name="latent_dim">dimension of gaussian blob. Defaults to 8.</param>
+        /// <param name="locally_connected_channels">channels on locally connected layer.Defaults to 2.</param>
+        /// <param name="act_func">activation function for most layers. Defaults to "softplus"</param>
+        /// <returns>Sequential: encoder model</returns>
+        static Tensorflow.Keras.Engine.Model CreateEncoderV1(int size=64, int latent_dim=8,
+            int locally_connected_channels= 2, string act_func= "softplus")
+        {
+            return keras.Sequential(
+                new List<ILayer>()
+                {
+                    // keras.Input(shape: (size, size, 1), name: $"retina_{size}"),
+
+                    //
+                    // V1 layers
+                    keras.layers.Conv2D(16, (5, 5), activation: act_func, padding: "same"),  // name: "v1_conv2d"
+                    keras.layers.MaxPooling2D((2, 2), padding: "same"), // name: "v1_maxpool"
+                    // keras.layers.SpatialDropout2D(0.1, name: "v1_dropout"),
+                    //
+                    // V2 layers
+                    keras.layers.Conv2D(16, (3, 3), activation: act_func, padding: "same"),  // name: "v2_conv2d"
+                    keras.layers.MaxPooling2D((2, 2), padding: "same"), // name: "v2_maxpool"
+                    //
+                    // V4 layers
+                    keras.layers.Conv2D(32, (3, 3), activation: act_func, padding: "same"), // name = "v4_conv2d"
+                    keras.layers.MaxPooling2D((2, 2), padding: "same"), // name = "v4_maxpool"
+                    //
+                    // IT Layers
+                    keras.layers.Conv2D(32, (3, 3), activation: act_func, padding: "same"),   // name = "pit_conv2d" 
+                    keras.layers.Conv2D(64, (3, 3), activation: act_func, padding: "same"),   // name = "cit_conv2d"
+                    //keras.layers.LocallyConnected2D(
+                    //    locally_connected_channels,
+                    //    (3, 3),
+                    //    activation: act_func,
+                    //    kernel_regularizer: l1_l2(0.5, 0.5)
+                    //),  // name: "ait_local"
+                    //
+                    // VLPFC
+                    // generate latent vector Q(z|X)
+                    keras.layers.Flatten(),     // name: "vlpfc_flatten"
+                    keras.layers.Dense(latent_dim, activation: act_func),       // name: "vlpfc_dense"
+                    keras.layers.Dense(latent_dim + latent_dim),        // name: "z_mean_log_var"
+                },
+                name: "v1_to_vlpfc_encoder"
+            );
         }
     }
 }
