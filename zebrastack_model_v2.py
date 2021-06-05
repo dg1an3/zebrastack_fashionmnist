@@ -394,14 +394,14 @@ def train_step(
         loss = compute_loss(encoder, decoder, x_samples)
 
         # now add loss due to channel matching
-        channel_weight = 0.1
-        loss += channel_weight * compute_loss_via_channels(
-            encoder,
-            decoder,
-            encoder_channels_extractor,
-            decoder_channels_extractor,
-            x_samples,
-        )
+        # channel_weight = 0.1
+        # loss += channel_weight * compute_loss_via_channels(
+        #     encoder,
+        #     decoder,
+        #     encoder_channels_extractor,
+        #     decoder_channels_extractor,
+        #     x_samples,
+        # )
 
         # tf.print(f"loss value = {loss}")
     gradients = tape.gradient(loss, all_trainable_variables)
